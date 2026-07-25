@@ -9,8 +9,12 @@ import { describe, expect, it } from "vitest";
 // by .github/workflows/ci.yml, which already hard-codes
 // `pnpm --filter db exec drizzle-kit check` — an `@prajasabha/db` scoped
 // name would not resolve for that filter without editing the workflow.
+//
+// Lives in packages/shared (not a standalone tests/ dir) so `pnpm -r test`
+// — the actual ci.yml step — exercises it; a root-level test directory
+// outside every workspace package is invisible to that recursive command.
 
-const repoRoot = resolve(__dirname, "../..");
+const repoRoot = resolve(__dirname, "../../../..");
 
 const expectedPackages: Array<{ dir: string; name: string }> = [
   { dir: "apps/web", name: "web" },
