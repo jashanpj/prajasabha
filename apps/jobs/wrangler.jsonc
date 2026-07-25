@@ -6,5 +6,9 @@
   "compatibility_flags": ["nodejs_compat"],
   "triggers": {
     "crons": []
+  },
+  "dev": {
+    "port": 8788,
+    "inspector_port": 9230
   }
 }
