@@ -1,0 +1,22 @@
+{
+  "name": "vault-svc",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.32",
+    "shared": "workspace:*",
+    "vault-db": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260724.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.4",
+    "wrangler": "^4.114.0"
+  }
+}

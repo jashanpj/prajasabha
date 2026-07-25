@@ -48,6 +48,9 @@ export const routingRoleEnum = pgEnum("routing_role", ["responsible", "copied"])
 // ended without a merge. Narrower than the full HLD timeline states —
 // widen with a new migration if a story needs more.
 export const issueStatusEnum = pgEnum("issue_status", ["draft", "published", "merged", "closed"]);
+// Added in migration 0001 (issue #20's "Malayalam/English language
+// choice" AC) — Malayalam is the default locale per CLAUDE.md.
+export const localeEnum = pgEnum("locale", ["ml", "en"]);
 
 export const members = pgTable("members", {
   memberId: uuid("member_id").primaryKey().defaultRandom(),
@@ -55,6 +58,7 @@ export const members = pgTable("members", {
   tier: memberTierEnum("tier").notNull().default("t0"),
   constituencyId: uuid("constituency_id"),
   wardId: uuid("ward_id"),
+  locale: localeEnum("locale").notNull().default("ml"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

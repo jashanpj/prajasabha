@@ -14,5 +14,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     exclude: ["**/node_modules/**", "**/dist/**", "**/.astro/**"],
+    // Applies packages/db's + packages/vault-db's migrations once before
+    // any test runs — see src/test/global-setup.ts.
+    globalSetup: "./src/test/global-setup.ts",
   },
 });

@@ -1,11 +1,41 @@
 /// <reference types="astro/client" />
 
-// No Worker bindings yet (KV/D1/R2 land with the stories that need them).
-// Regenerate via `wrangler types` once wrangler.jsonc declares any.
-type Env = Record<string, never>;
-
-type Runtime = import("@astrojs/cloudflare").Runtime<Env>;
-
-declare namespace App {
-  interface Locals extends Runtime {}
+// Astro v6 + @astrojs/cloudflare no longer expose bindings via
+// `Astro.locals.runtime.env` (removed — see that package's own runtime
+// deprecation error). Bindings now come from
+// `import { env } from "cloudflare:workers"`, typed via this
+// declaration-merged `Cloudflare.Env` interface (the same mechanism
+// `wrangler types` would generate into). Because that import is a
+// virtual module only resolvable inside a real Workers/Miniflare
+// runtime, every route handler here is a thin wrapper that does the
+// import lazily inside its function body — see
+// src/pages/api/auth/register/{start,verify}.ts — so Vitest can import
+// and test the underlying pure functions without ever resolving
+// "cloudflare:workers".
+declare namespace Cloudflare {
+  interface Env {
+    // packages/db runtime connection — app_role, inherits service_role's
+    // grants via role membership (packages/db/migrations/0002). See
+    // apps/web/src/lib/db.ts.
+    APP_DATABASE_URL: string;
+    // Cloudflare KV — fixed-window rate-limit counters (packages/shared's
+    // checkAndIncrement).
+    RATE_LIMIT_KV: KVNamespace;
+    // Service binding to apps/vault-svc — the only way apps/web reaches
+    // the identity vault, never a direct packages/vault-db import
+    // (invariant 2).
+    VAULT_SVC: Fetcher;
+    VAULT_SVC_INTERNAL_TOKEN: string;
+    RESEND_API_KEY: string;
+    TURNSTILE_SECRET_KEY: string;
+    TURNSTILE_SITE_KEY: string;
+    SESSION_SECRET: string;
+    // Read here only for the emailed copy ("expires in N minutes") — the
+    // enforced expiry itself lives in apps/vault-svc, which computes
+    // expiresAt from this same var.
+    MAGIC_LINK_TTL_MINUTES: string;
+    REGISTER_RATE_LIMIT_PER_EMAIL_PER_HOUR: string;
+    REGISTER_RATE_LIMIT_PER_IP_PER_HOUR: string;
+    VERIFY_RATE_LIMIT_PER_IP_PER_HOUR: string;
+  }
 }

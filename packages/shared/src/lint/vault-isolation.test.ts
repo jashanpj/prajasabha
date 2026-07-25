@@ -50,6 +50,34 @@ describe("AC4: checkVaultIsolation", () => {
     expect(violations.some((v) => v.includes("bad.ts"))).toBe(true);
   });
 
+  it("allows apps/vault-svc to import vault-db (the sole deliberate exception, issue #20)", () => {
+    const root = makeFixtureRoot();
+    const vaultSvcDir = join(root, "apps", "vault-svc", "src");
+    mkdirSync(vaultSvcDir, { recursive: true });
+    writeFileSync(
+      join(vaultSvcDir, "index.ts"),
+      `import { createVaultDbClient } from "vault-db";\n\nexport const client = createVaultDbClient;\n`,
+      "utf-8",
+    );
+
+    expect(checkVaultIsolation(root)).toEqual([]);
+  });
+
+  it("still flags apps/web importing vault-db even when apps/vault-svc also exists", () => {
+    const root = makeFixtureRoot();
+    const vaultSvcDir = join(root, "apps", "vault-svc", "src");
+    mkdirSync(vaultSvcDir, { recursive: true });
+    writeFileSync(join(vaultSvcDir, "index.ts"), `import { schema } from "vault-db";\n`, "utf-8");
+
+    const webDir = join(root, "apps", "web", "src");
+    mkdirSync(webDir, { recursive: true });
+    writeFileSync(join(webDir, "bad.ts"), `import { schema } from "vault-db";\n`, "utf-8");
+
+    const violations = checkVaultIsolation(root);
+    expect(violations.some((v) => v.includes("bad.ts"))).toBe(true);
+    expect(violations.some((v) => v.includes("vault-svc"))).toBe(false);
+  });
+
   it("returns no violations for a clean tree with no vault-db references under apps/*", () => {
     const root = makeFixtureRoot();
     const goodFileDir = join(root, "apps", "web", "src");

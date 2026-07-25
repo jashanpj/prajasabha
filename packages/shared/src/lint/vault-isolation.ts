@@ -22,6 +22,15 @@ function listSourceFiles(dir: string): string[] {
   return files;
 }
 
+// apps/vault-svc (issue #20) is the sole, deliberate exception: CLAUDE.md
+// invariant 2 lists apps/web, apps/api, and apps/jobs by name, not "every
+// app" — apps/vault-svc exists specifically to be the only thing that
+// imports packages/vault-db, so apps/web etc. never have to. See HLD §4's
+// "vault-svc exposes internal operations, called only by apps/web" and
+// packages/shared/src/lint/vault-isolation.repo.test.ts's fixture proving
+// apps/web/apps/api/apps/jobs are still checked.
+const ALLOWED_VAULT_DB_IMPORTERS = new Set(["vault-svc"]);
+
 /**
  * Scans apps/*\/src for any import/require specifier referencing vault-db.
  * Enforces CLAUDE.md invariant 2: packages/vault-db is never imported by
@@ -39,6 +48,7 @@ export function checkVaultIsolation(rootDir: string): string[] {
   }
 
   for (const appName of appNames) {
+    if (ALLOWED_VAULT_DB_IMPORTERS.has(appName)) continue;
     const srcDir = join(appsDir, appName, "src");
     let sourceFiles: string[];
     try {

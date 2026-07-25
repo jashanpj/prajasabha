@@ -6,5 +6,19 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"
-  }
+  },
+  // Issue #20 — A1 registration. RATE_LIMIT_KV needs a real namespace id
+  // per environment (`wrangler kv namespace create RATE_LIMIT_KV`) before
+  // deploying — "local-dev-placeholder" only works for `wrangler dev`'s
+  // local KV emulation. VAULT_SVC is a service binding to apps/vault-svc —
+  // the only way this Worker reaches the identity vault, never a direct
+  // packages/vault-db import (CLAUDE.md invariant 2).
+  "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "local-dev-placeholder" }],
+  "services": [{ "binding": "VAULT_SVC", "service": "prajasabha-vault-svc" }]
+  // Secrets (never committed — set via `wrangler secret put <NAME>` per
+  // environment, or a gitignored .env/.dev.vars locally): APP_DATABASE_URL,
+  // VAULT_SVC_INTERNAL_TOKEN, RESEND_API_KEY, TURNSTILE_SECRET_KEY,
+  // TURNSTILE_SITE_KEY, SESSION_SECRET, MAGIC_LINK_TTL_MINUTES,
+  // REGISTER_RATE_LIMIT_PER_EMAIL_PER_HOUR, REGISTER_RATE_LIMIT_PER_IP_PER_HOUR,
+  // VERIFY_RATE_LIMIT_PER_IP_PER_HOUR — see .env.example.
 }

@@ -11,3 +11,5 @@ export function createVaultDbClient(vaultDatabaseUrl: string) {
 }
 
 export { schema };
+export { decryptEmail, encryptEmail, hashEmail, normalizeEmail } from "./crypto";
+export { runMigrations } from "./migrate";

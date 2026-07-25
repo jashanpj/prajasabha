@@ -40,13 +40,22 @@ BEGIN
 END
 $$;
 
-GRANT ALL ON SCHEMA public TO app_role;
+-- app_role deliberately gets NO direct grant on schema public or any of
+-- its tables (issue #20): it exists only to log in and immediately
+-- `SET ROLE service_role`, so every actual query runs under
+-- service_role's own grants/RLS policies from
+-- packages/db/migrations/0000 + 0002, not as a superuser-adjacent
+-- identity with its own standing access. An earlier version of this file
+-- granted app_role table-level ALL by default, which RLS's zero-policy
+-- default-deny happened to neuter for SELECT (rows filtered to empty)
+-- but would have surfaced confusingly for INSERT/UPDATE/DELETE — removed
+-- rather than relied on RLS alone to paper over it.
 REVOKE ALL ON SCHEMA vault FROM app_role;
 
 GRANT ALL ON SCHEMA vault TO vault_role;
 REVOKE ALL ON SCHEMA public FROM vault_role;
 
--- Default privileges so future tables created by each role's own migrations
--- inherit the same isolation without a manual GRANT per table.
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO app_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA vault GRANT ALL ON TABLES TO vault_role;
+-- vault_role's actual table grants (SELECT/INSERT/UPDATE, no DELETE) come
+-- exclusively from packages/vault-db/migrations/0000 — no default-privilege
+-- shortcut here, so the migration stays the single source of truth for
+-- exactly what vault_role can do.

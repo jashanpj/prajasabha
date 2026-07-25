@@ -1,3 +1,22 @@
 {
-  "home.tagline": "Coming soon"
+  "home.tagline": "Coming soon",
+  "register.title": "Register",
+  "register.email.label": "Email address",
+  "register.pseudonym.label": "Choose a pseudonym",
+  "register.pseudonym.hint": "This is the name other members will see — not your real name.",
+  "register.submit": "Send me a sign-in link",
+  "register.sending": "Sending…",
+  "register.checkEmail.title": "Check your email",
+  "register.checkEmail.body": "We've sent a sign-in link to your email address. It expires in {ttl} minutes.",
+  "register.error.invalid_body": "Please fill in a valid email and pseudonym.",
+  "register.error.turnstile_failed": "We couldn't verify you're human. Please try again.",
+  "register.error.rate_limited": "Too many attempts. Please wait a while and try again.",
+  "register.error.pseudonym_profanity": "That pseudonym isn't allowed. Please choose another.",
+  "register.error.pseudonym_party_name": "Pseudonyms can't reference a political party. Please choose another.",
+  "register.error.pseudonym_taken": "That pseudonym is already taken. Please choose another.",
+  "register.error.email_send_failed": "We couldn't send the email. Please try again.",
+  "register.error.generic": "Something went wrong. Please try again.",
+  "verify.error.invalid_token": "This sign-in link is invalid.",
+  "verify.error.expired_or_consumed_token": "This sign-in link has expired or was already used. Please register again.",
+  "verify.error.registration_conflict": "Your chosen pseudonym was taken while you were verifying. Please register again with a different pseudonym."
 }

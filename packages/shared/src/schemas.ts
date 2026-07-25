@@ -18,6 +18,7 @@ export const registrationRequestSchema = z.object({
   email: z.string().email(),
   pseudonym: z.string().min(3).max(32),
   locale: z.enum(["ml", "en"]),
+  turnstileToken: z.string().min(1),
 });
 export type RegistrationRequest = z.infer<typeof registrationRequestSchema>;
 

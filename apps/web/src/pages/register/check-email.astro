@@ -1,0 +1,27 @@
+---
+import Logo from "../../components/Logo.astro";
+import TricolourHairline from "../../components/TricolourHairline.astro";
+import "../../styles/global.css";
+import en from "../../i18n/en.json";
+import ml from "../../i18n/ml.json";
+
+const locale = Astro.url.searchParams.get("lang") === "en" ? "en" : "ml";
+const t = locale === "en" ? en : ml;
+const ttl = Astro.url.searchParams.get("ttl") ?? "15";
+const checkEmailBody = t["register.checkEmail.body"].replace("{ttl}", ttl);
+---
+
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <title>{t["register.checkEmail.title"]}</title>
+  </head>
+  <body>
+    <header>
+      <Logo size={40} />
+      <h1>{t["register.checkEmail.title"]}</h1>
+    </header>
+    <TricolourHairline />
+    <p>{checkEmailBody}</p>
+  </body>
+</html>

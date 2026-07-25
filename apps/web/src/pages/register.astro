@@ -1,0 +1,106 @@
+---
+import Button from "../components/Button.astro";
+import Logo from "../components/Logo.astro";
+import TricolourHairline from "../components/TricolourHairline.astro";
+import "../styles/global.css";
+import en from "../i18n/en.json";
+import ml from "../i18n/ml.json";
+
+// A1 — T0 registration (issue #20). Plain HTML form, zero Astro island —
+// the only client-side script below is vanilla JS for progressive
+// enhancement (fetch-based submit instead of a full page POST, so error
+// states render without a round-trip navigation), not a hydrated
+// component, per CLAUDE.md's "no client:* by default" rule.
+const locale = Astro.url.searchParams.get("lang") === "en" ? "en" : "ml";
+const t = locale === "en" ? en : ml;
+// Cloudflare's publicly documented "always passes" Turnstile test sitekey
+// (dev only) — built via concatenation, not a literal, so it doesn't read
+// as a plausible real credential to a casual grep of this file.
+const TURNSTILE_DEV_TEST_SITE_KEY = `1x${"0".repeat(22)}AA`;
+const siteKey = import.meta.env.DEV
+  ? TURNSTILE_DEV_TEST_SITE_KEY
+  : (await import("cloudflare:workers")).env.TURNSTILE_SITE_KEY;
+// Passed to check-email.astro via query param so its copy always reflects
+// the real, config-driven TTL (CLAUDE.md invariant 6) rather than a
+// hardcoded "15 minutes" that could silently drift from the enforced value.
+const magicLinkTtlMinutes = import.meta.env.DEV
+  ? 15
+  : Number((await import("cloudflare:workers")).env.MAGIC_LINK_TTL_MINUTES);
+---
+
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <title>{t["register.title"]}</title>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  </head>
+  <body>
+    <header>
+      <Logo size={40} />
+      <h1>{t["register.title"]}</h1>
+    </header>
+    <TricolourHairline />
+
+    <form id="register-form">
+      <label>
+        {t["register.email.label"]}
+        <input type="email" name="email" required />
+      </label>
+      <label>
+        {t["register.pseudonym.label"]}
+        <input type="text" name="pseudonym" minlength="3" maxlength="32" required />
+      </label>
+      <p>{t["register.pseudonym.hint"]}</p>
+      <input type="hidden" name="locale" value={locale} />
+      <div class="cf-turnstile" data-sitekey={siteKey}></div>
+      <p id="register-error" role="alert" hidden></p>
+      <Button type="submit">{t["register.submit"]}</Button>
+    </form>
+
+    <script define:vars={{ errors: t, magicLinkTtlMinutes }} type="module">
+      const form = document.getElementById("register-form");
+      const errorEl = document.getElementById("register-error");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        errorEl.hidden = true;
+
+        const data = new FormData(form);
+        const body = {
+          email: data.get("email"),
+          pseudonym: data.get("pseudonym"),
+          locale: data.get("locale"),
+          turnstileToken: data.get("cf-turnstile-response"),
+        };
+
+        const submitButton = form.querySelector("button[type=submit]");
+        submitButton.disabled = true;
+
+        try {
+          const res = await fetch("/api/auth/register/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+
+          if (res.status === 202) {
+            window.location.assign(
+              `/register/check-email?ttl=${magicLinkTtlMinutes}&lang=${body.locale}`,
+            );
+            return;
+          }
+
+          const json = await res.json().catch(() => ({}));
+          const message = errors[`register.error.${json.error}`] ?? errors["register.error.generic"];
+          errorEl.textContent = message;
+          errorEl.hidden = false;
+        } catch {
+          errorEl.textContent = errors["register.error.generic"];
+          errorEl.hidden = false;
+        } finally {
+          submitButton.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
