@@ -13,12 +13,21 @@ you via the checked-in `.claude/agents` and `.claude/hooks`.
 git clone https://github.com/jashanpj/prajasabha.git
 cd prajasabha
 pnpm install
-docker compose up -d   # local Postgres + any other local-only deps
+cp .env.example .env
+docker compose up -d          # local Postgres: `public` (participation) + `vault` schema
+pnpm --filter db run migrate  # applies packages/db's migrations
 pnpm dev
 ```
 
 You don't need a Supabase or Cloudflare account to get a local dev loop
 running — those are only required for deploying, not for building.
+
+`docker-compose.yml` runs a single Postgres container with two schemas,
+`public` and `vault`, isolated from each other by role grants (see the
+file's header comment and `docker/postgres/init/`). This is a local-dev
+convenience, not the production security boundary — prod keeps the
+participation DB and identity vault in two physically separate Supabase
+projects (HLD §4.1). Don't point staging/prod config at this compose file.
 
 ## Workflow
 

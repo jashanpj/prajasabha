@@ -1,0 +1,87 @@
+---
+// Button primitive (issue #73): primary/secondary/tertiary variants, plus
+// pressed/disabled states expressed purely in CSS (no client JS — zero-JS
+// by default per CLAUDE.md's Astro islands rule; nothing here needs
+// hydration). Renders as <a> when `href` is given, <button> otherwise.
+export interface Props {
+  variant?: "primary" | "secondary" | "tertiary";
+  disabled?: boolean;
+  href?: string;
+  type?: "button" | "submit" | "reset";
+  class?: string;
+}
+
+const {
+  variant = "primary",
+  disabled = false,
+  href,
+  type = "button",
+  class: className,
+} = Astro.props;
+const Tag = href ? "a" : "button";
+---
+
+<Tag
+  class:list={["ps-button", `ps-button--${variant}`, className]}
+  href={href}
+  type={href ? undefined : type}
+  disabled={href ? undefined : disabled}
+  aria-disabled={disabled ? "true" : undefined}
+  data-testid="ps-button"
+>
+  <slot />
+</Tag>
+
+<style>
+  .ps-button {
+    display: inline-block;
+    font-family: var(--font-family-body);
+    font-size: var(--font-size-body);
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    border-radius: var(--radius-button);
+    border: 1px solid transparent;
+    padding: 0.6em 1.2em;
+    cursor: pointer;
+  }
+
+  .ps-button--primary {
+    background: var(--color-navy);
+    color: var(--color-ivory);
+  }
+  .ps-button--primary:active {
+    background: var(--color-navy-pressed);
+  }
+  .ps-button--primary:disabled,
+  .ps-button--primary[aria-disabled="true"] {
+    background: var(--color-disabled);
+    color: var(--color-muted);
+    cursor: not-allowed;
+  }
+
+  .ps-button--secondary {
+    background: transparent;
+    color: var(--color-navy);
+    border-color: var(--color-navy);
+  }
+  .ps-button--secondary:disabled,
+  .ps-button--secondary[aria-disabled="true"] {
+    color: var(--color-disabled);
+    border-color: var(--color-disabled);
+    cursor: not-allowed;
+  }
+
+  .ps-button--tertiary {
+    background: transparent;
+    color: var(--color-saffron);
+    border: none;
+    padding: 0;
+    text-decoration: underline;
+  }
+  .ps-button--tertiary:disabled,
+  .ps-button--tertiary[aria-disabled="true"] {
+    color: var(--color-disabled);
+    cursor: not-allowed;
+  }
+</style>

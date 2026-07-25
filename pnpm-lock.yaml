@@ -109,6 +109,10 @@ importers:
         version: 2.1.9(@types/node@20.19.43)(lightningcss@1.33.0)
 
   packages/shared:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.17.9

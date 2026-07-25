@@ -1,5 +1,8 @@
 ---
 import { APP_NAME } from "shared";
+import Logo from "../components/Logo.astro";
+import TricolourHairline from "../components/TricolourHairline.astro";
+import "../styles/global.css";
 import ml from "../i18n/ml.json";
 
 // Locale routing/detection is a later story — this scaffold just proves
@@ -14,7 +17,11 @@ const tagline = ml["home.tagline"];
     <title>{APP_NAME}</title>
   </head>
   <body>
-    <h1>{APP_NAME}</h1>
+    <header>
+      <Logo size={40} />
+      <h1>{APP_NAME}</h1>
+    </header>
+    <TricolourHairline />
     <p>{tagline}</p>
   </body>
 </html>

@@ -1,0 +1,80 @@
+---
+// Status chip primitive (issue #73): rectangular (6px radius, not pill —
+// distinguishes it from Badge), icon + label, never color alone.
+//
+// Labels come straight from packages/shared/status.ts, verbatim — never
+// re-typed here (the i18n-auditor subagent checks for this). The
+// acknowledged/actedUpon/noResponse strings already carry their icon glyph
+// (→ / ✓ / –) as the leading character of the literal string itself; only
+// "Delivered" needs a separate icon element below, since its product-law
+// string is plain text with no glyph of its own.
+import { STATUS_ACKNOWLEDGED, STATUS_ACTED_UPON, STATUS_DELIVERED, statusNoResponse } from "shared";
+
+export interface Props {
+  status: "delivered" | "acknowledged" | "actedUpon" | "noResponse";
+  days?: number;
+  class?: string;
+}
+
+const { status, days, class: className } = Astro.props;
+
+if (status === "noResponse" && typeof days !== "number") {
+  throw new Error("StatusChip: status 'noResponse' requires a `days` prop.");
+}
+
+const label =
+  status === "delivered"
+    ? STATUS_DELIVERED
+    : status === "acknowledged"
+      ? STATUS_ACKNOWLEDGED
+      : status === "actedUpon"
+        ? STATUS_ACTED_UPON
+        : statusNoResponse(days as number);
+---
+
+<span class:list={["ps-status-chip", `ps-status-chip--${status}`, className]} data-testid="ps-status-chip">
+  {status === "delivered" && <span class="ps-status-chip__ring" aria-hidden="true" />}
+  <span>{label}</span>
+</span>
+
+<style>
+  .ps-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.2em 0.6em;
+    border-radius: var(--radius-status-chip);
+    border: 1px solid;
+    font-family: var(--font-family-body);
+    font-size: var(--font-size-caption);
+    font-weight: 500;
+  }
+  .ps-status-chip__ring {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+  }
+
+  .ps-status-chip--delivered {
+    color: var(--status-delivered-text);
+    background: var(--status-delivered-fill);
+    border-color: var(--status-delivered-border);
+  }
+  .ps-status-chip--acknowledged {
+    color: var(--status-acknowledged-text);
+    background: var(--status-acknowledged-fill);
+    border-color: var(--status-acknowledged-border);
+  }
+  .ps-status-chip--actedUpon {
+    color: var(--status-acted-upon-text);
+    background: var(--status-acted-upon-fill);
+    border-color: var(--status-acted-upon-border);
+  }
+  .ps-status-chip--noResponse {
+    color: var(--status-no-response-text);
+    background: var(--status-no-response-fill);
+    border-color: var(--status-no-response-border);
+  }
+</style>
