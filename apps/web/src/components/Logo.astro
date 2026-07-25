@@ -1,0 +1,58 @@
+---
+// Original 24-spoke wheel mark (issue #73) — outer ring, a dashed spoke
+// ring with a visible gap from both the ring and the center dot, plain
+// strokes. NOT a reproduction of the State Emblem/Ashoka Chakra: that mark
+// uses 24 solid, rim-touching spokes radiating from a filled hub with no
+// gaps anywhere. Do not "complete" this into a chakra — no filled spokes,
+// no touching the outer ring, no removing the dashes. See
+// docs/design-system.md.
+export interface Props {
+  size?: number;
+  class?: string;
+}
+
+const { size = 40, class: className } = Astro.props;
+
+const SPOKE_COUNT = 24;
+const CENTER = 50;
+const OUTER_RING_RADIUS = 44;
+const SPOKE_INNER_RADIUS = 16;
+const SPOKE_OUTER_RADIUS = 38;
+
+const spokes = Array.from({ length: SPOKE_COUNT }, (_, i) => {
+  const angle = ((i * 360) / SPOKE_COUNT) * (Math.PI / 180);
+  return {
+    x1: CENTER + SPOKE_INNER_RADIUS * Math.cos(angle),
+    y1: CENTER + SPOKE_INNER_RADIUS * Math.sin(angle),
+    x2: CENTER + SPOKE_OUTER_RADIUS * Math.cos(angle),
+    y2: CENTER + SPOKE_OUTER_RADIUS * Math.sin(angle),
+  };
+});
+---
+
+<svg
+  class={className}
+  width={size}
+  height={size}
+  viewBox="0 0 100 100"
+  role="img"
+  aria-label="Praja"
+  data-testid="ps-logo"
+>
+  <circle cx={CENTER} cy={CENTER} r={OUTER_RING_RADIUS} fill="none" stroke="var(--color-navy)" stroke-width="2" />
+  {
+    spokes.map((s) => (
+      <line
+        x1={s.x1}
+        y1={s.y1}
+        x2={s.x2}
+        y2={s.y2}
+        stroke="var(--color-navy)"
+        stroke-width="2"
+        stroke-dasharray="3 3"
+        stroke-linecap="round"
+      />
+    ))
+  }
+  <circle cx={CENTER} cy={CENTER} r="6" fill="var(--color-navy)" />
+</svg>

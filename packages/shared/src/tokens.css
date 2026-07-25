@@ -1,0 +1,94 @@
+/*
+ * PrajaSabha design tokens (issue #73) — single source of truth for color,
+ * type, and the tricolour balance rule from docs/design-system.md /
+ * CLAUDE.md's "Design law". Plain CSS custom properties, not Tailwind —
+ * matches the issue text's "CSS variables" framing and avoids a new build
+ * dependency for ~5 static components. Consumed by apps/web via
+ * `import "shared/tokens.css"` (see packages/shared/package.json's
+ * "exports" map) — Astro components should read `var(--token-name)`,
+ * never a hardcoded hex value.
+ *
+ * Fonts are loaded from Google Fonts via @import rather than self-hosted
+ * .woff2 files. Self-hosting is the better long-term choice for a civic
+ * platform serving patchy-connectivity users (no third-party request on
+ * the render path), but it needs a subsetting pipeline for the Malayalam
+ * fonts (large Unicode coverage) that doesn't exist in this repo yet.
+ * Deliberately deferred rather than shipping unsubsetted multi-MB fonts
+ * for a Phase-0 demo — track as a follow-up chore before a real launch.
+ */
+@import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@700&family=Public+Sans:wght@400;500;600;700&family=Noto+Serif+Malayalam:wght@600;700&family=Noto+Sans+Malayalam:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Color — Chakra Navy dominant, saffron/green as accents that never
+     appear apart, ivory background, charcoal text. */
+  --color-navy: #1a2e5c;
+  --color-navy-pressed: #111f42;
+  --color-saffron: #e8862d;
+  --color-green: #1e7a46;
+  --color-ivory: #faf9f6;
+  --color-charcoal: #22262b;
+  --color-muted: #6b7180;
+  --color-disabled: #c9ccd4;
+  --color-card-border: #e0dcd2;
+  --color-card-fill: #ffffff;
+
+  /* Status-chip semantic colors (text/fill/border per state) */
+  --status-delivered-text: #1a2e5c;
+  --status-delivered-fill: transparent;
+  --status-delivered-border: #c4cadb;
+
+  --status-acknowledged-text: #8a5314;
+  --status-acknowledged-fill: #fbf0e2;
+  --status-acknowledged-border: #ebcfa8;
+
+  --status-acted-upon-text: #175e37;
+  --status-acted-upon-fill: #eaf3ee;
+  --status-acted-upon-border: #bdd9c9;
+
+  --status-no-response-text: #565b64;
+  --status-no-response-fill: #f0eee8;
+  --status-no-response-border: #d8d4c9;
+
+  /* Identity badges (T2 reuses the "acted upon" green family) */
+  --badge-t1-text: var(--color-navy);
+  --badge-t1-border: var(--color-navy);
+  --badge-t2-text: var(--status-acted-upon-text);
+  --badge-t2-fill: var(--status-acted-upon-fill);
+  --badge-t2-border: var(--status-acted-upon-border);
+
+  /* Progress/quorum bars */
+  --progress-track: #ece9e1;
+
+  /* Type — EN defaults (Source Serif 4 headings, Public Sans body/UI) */
+  --font-family-heading: "Source Serif 4", ui-serif, serif;
+  --font-family-body: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-weight-heading: 700;
+
+  --font-size-display: 28px;
+  --font-size-heading: 20px;
+  --font-size-section-label: 15px;
+  --font-size-body: 14px;
+  --font-size-caption: 12px;
+  --line-height-body: 1.55;
+  --font-weight-section-label: 600;
+
+  --radius-button: 8px;
+  --radius-card: 12px;
+  --radius-status-chip: 6px;
+}
+
+/* ML headings/body: Noto Serif/Sans Malayalam, matching weights side by
+   side with EN rather than a smaller afterthought — set on <html lang="ml">
+   since Malayalam is the default locale (CLAUDE.md), applied wherever a
+   bilingual pairing needs the ML family explicitly. */
+html[lang="ml"],
+.lang-ml {
+  --font-family-heading: "Noto Serif Malayalam", ui-serif, serif;
+  --font-family-body: "Noto Sans Malayalam", ui-sans-serif, system-ui, sans-serif;
+  --font-weight-heading: 600;
+}
+
+/* Numerals on every stat/count, per design-system.md. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

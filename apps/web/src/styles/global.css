@@ -1,0 +1,33 @@
+/* Base page styles built on packages/shared's design tokens (issue #73).
+   Any new global rule here should read a var(--token), never hardcode a
+   hex color or font family directly. */
+@import "shared/tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ivory);
+  color: var(--color-charcoal);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-family-heading);
+  font-weight: var(--font-weight-heading);
+  margin: 0 0 0.5em;
+}
+
+h1 {
+  font-size: var(--font-size-display);
+}
+
+h2 {
+  font-size: var(--font-size-heading);
+}

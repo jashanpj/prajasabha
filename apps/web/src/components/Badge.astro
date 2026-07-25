@@ -1,0 +1,71 @@
+---
+// Identity badge primitive (issue #73): pill-shaped, icon-in-circle +
+// label — visually distinct from StatusChip's rectangular shape, per
+// docs/design-system.md ("this shape distinguishes them from identity
+// badges"). Never mixed with civic-activity data on the same row without
+// separation (vault join rule is a data concern, not this component's —
+// callers must not pass identity-linked civic data as props here).
+export interface Props {
+  tier: "t1" | "t2";
+  ward?: string;
+  class?: string;
+}
+
+const { tier, ward, class: className } = Astro.props;
+
+if (tier === "t2" && !ward) {
+  throw new Error(
+    "Badge: tier 't2' ('Verified Constituent') always includes the ward name — see docs/design-system.md.",
+  );
+}
+
+const label = tier === "t1" ? "Verified Citizen" : `Verified Constituent — ${ward}`;
+---
+
+<span class:list={["ps-badge", `ps-badge--${tier}`, className]} data-testid="ps-badge">
+  <span class="ps-badge__icon" aria-hidden="true">✓</span>
+  <span class="ps-badge__label">{label}</span>
+</span>
+
+<style>
+  .ps-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.25em 0.75em;
+    border-radius: 999px;
+    border: 1px solid;
+    font-family: var(--font-family-body);
+    font-size: var(--font-size-caption);
+    font-weight: 600;
+  }
+  .ps-badge__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 50%;
+    font-size: 0.85em;
+  }
+
+  .ps-badge--t1 {
+    color: var(--badge-t1-text);
+    border-color: var(--badge-t1-border);
+    background: transparent;
+  }
+  .ps-badge--t1 .ps-badge__icon {
+    border: 1px solid var(--badge-t1-border);
+    color: var(--badge-t1-text);
+  }
+
+  .ps-badge--t2 {
+    color: var(--badge-t2-text);
+    border-color: var(--badge-t2-border);
+    background: var(--badge-t2-fill);
+  }
+  .ps-badge--t2 .ps-badge__icon {
+    background: var(--badge-t2-text);
+    color: var(--badge-t2-fill);
+  }
+</style>
