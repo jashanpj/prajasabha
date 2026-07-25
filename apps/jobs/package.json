@@ -1,0 +1,16 @@
+{
+  "name": "jobs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260724.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.4",
+    "wrangler": "^4.114.0"
+  }
+}

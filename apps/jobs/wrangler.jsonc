@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prajasabha-jobs",
+  "main": "./src/index.ts",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "triggers": {
+    "crons": []
+  },
+  "dev": {
+    "port": 8788,
+    "inspector_port": 19230
+  }
+}
