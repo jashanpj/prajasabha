@@ -44,7 +44,6 @@ describe("epicVerificationSubmissionSchema (A3)", () => {
     expect(
       epicVerificationSubmissionSchema.parse({
         memberId: VALID_UUID,
-        epicNo: "ABC1234567",
         docRef: "r2://vault/doc-1",
       }),
     ).toBeTruthy();
@@ -54,10 +53,13 @@ describe("epicVerificationSubmissionSchema (A3)", () => {
     expect(() =>
       epicVerificationSubmissionSchema.parse({
         memberId: "not-a-uuid",
-        epicNo: "ABC1234567",
         docRef: "r2://vault/doc-1",
       }),
     ).toThrow();
+  });
+
+  it("never carries the raw EPIC number — vault join rule (CLAUDE.md invariant 1)", () => {
+    expect(epicVerificationSubmissionSchema.shape).not.toHaveProperty("epicNo");
   });
 });
 

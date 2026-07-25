@@ -1,24 +1,14 @@
 import { z } from "zod";
 
-// PRD/HLD-adopted values (see .env.example for the full var list this
-// mirrors): Concern threshold = 100 T2 supporters (PRD Module B4 AC),
-// quorum = 20% of verified constituents (PRD), panel term = 6 months (HLD
-// §8 / design v1.1 — PRD v1.0's 90 days is superseded, though PRD §8 still
-// lists it under "Open Product Decisions", so treat 6 months as the
-// current adopted value, not yet fully locked).
-//
-// These are the loader's OWN documented fallback for local dev/tests, not
-// magic numbers at business-logic call sites — CLAUDE.md invariant 6
-// ("no secrets, thresholds, or rate-limit values in code — Wrangler
-// secrets / KV config only") governs production values, which come from
-// env (itself populated by Wrangler vars/secrets or a KV-backed config
-// loader upstream of this function). Call sites always go through
-// loadConfig(env), never compare against a hardcoded number directly.
-const LOCAL_DEV_DEFAULTS = {
-  CONCERN_THRESHOLD_T2: "100",
-  QUORUM_PERCENT: "20",
-  PANEL_TERM_MONTHS: "6",
-} satisfies Record<string, string>;
+// CLAUDE.md invariant 6: "No secrets, thresholds, or rate-limit values in
+// code. Wrangler secrets / KV config only. Assume hostile readers of this
+// public repo." — read strictly, with no local-dev carve-out: this module
+// must never embed the real concern-threshold/quorum/panel-term numbers as
+// a silent fallback, even for convenience. Every value must come from env
+// (Wrangler vars/secrets in deployed environments; a gitignored `.env`,
+// populated from `.env.example`, for local dev — see CONTRIBUTING.md).
+// loadConfig throws if a var is missing rather than defaulting.
+const REQUIRED_VARS = ["CONCERN_THRESHOLD_T2", "QUORUM_PERCENT", "PANEL_TERM_MONTHS"] as const;
 
 const ConfigSchema = z.object({
   concernThresholdT2: z.coerce.number().int().positive(),
@@ -33,21 +23,20 @@ export type AppConfig = z.infer<typeof ConfigSchema>;
  * (never read from `process.env` internally) because Cloudflare Workers
  * have no `process.env` — callers pass the Workers `env` binding
  * (apps/web, apps/jobs) or `process.env` in Node contexts (vitest,
- * scripts). Unset vars fall back to LOCAL_DEV_DEFAULTS; set vars always
- * win, and an invalid value throws a ZodError rather than silently
- * coercing to something wrong.
+ * scripts). Throws if any required var is missing or fails validation —
+ * call sites always go through loadConfig(env), never a hardcoded number.
  */
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
-  const source = { ...LOCAL_DEV_DEFAULTS, ...stripUndefined(env) };
-  return ConfigSchema.parse({
-    concernThresholdT2: source.CONCERN_THRESHOLD_T2,
-    quorumPercent: source.QUORUM_PERCENT,
-    panelTermMonths: source.PANEL_TERM_MONTHS,
-  });
-}
+  const missing = REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required config env var(s): ${missing.join(", ")}. Copy .env.example to .env for local dev, or set these via Wrangler vars/secrets in deployed environments.`,
+    );
+  }
 
-function stripUndefined(env: Record<string, string | undefined>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined),
-  );
+  return ConfigSchema.parse({
+    concernThresholdT2: env.CONCERN_THRESHOLD_T2,
+    quorumPercent: env.QUORUM_PERCENT,
+    panelTermMonths: env.PANEL_TERM_MONTHS,
+  });
 }

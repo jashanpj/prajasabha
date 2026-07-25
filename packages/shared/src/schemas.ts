@@ -21,14 +21,21 @@ export const registrationRequestSchema = z.object({
 });
 export type RegistrationRequest = z.infer<typeof registrationRequestSchema>;
 
-// A3: EPIC (voter ID) submission for T2 upgrade. Only carries member_id +
-// an opaque doc reference — never the EPIC number or document itself
-// alongside civic-activity data (vault join rule, CLAUDE.md invariant 1).
-// The actual EPIC value and verification record are vault-svc's concern
-// (packages/vault-db, issue #16), not packages/db's.
+// A3: EPIC (voter ID) verification submission for T2 upgrade — deliberately
+// narrow. `memberId` is the exact join key used everywhere in packages/db
+// to attribute civic activity (issue_support.member_id, issues.created_by,
+// event_log.actor_member_id); the vault join rule (CLAUDE.md invariant 1)
+// forbids any *type*, not just any table, that pairs an identity attribute
+// with it. The raw EPIC number is therefore never expressed in this
+// schema, which lives in packages/shared and is importable from apps/web,
+// apps/api, and apps/jobs alike — a joined shape here could get reused as
+// a log/analytics payload later. `docRef` is an opaque, already-uploaded
+// document/session reference (vault-svc issues it); the client submits the
+// EPIC number itself directly to a vault-svc-scoped endpoint/schema that
+// does not live in packages/shared (packages/vault-db, issue #16, out of
+// scope here).
 export const epicVerificationSubmissionSchema = z.object({
   memberId: z.string().uuid(),
-  epicNo: z.string().min(6).max(20),
   docRef: z.string().min(1),
 });
 export type EpicVerificationSubmission = z.infer<typeof epicVerificationSubmissionSchema>;
