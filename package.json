@@ -2,9 +2,9 @@
   "name": "prajasabha",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@9.15.9",
+  "packageManager": "pnpm@10.34.5",
   "engines": {
-    "node": ">=20 <21"
+    "node": ">=22.12"
   },
   "scripts": {
     "dev": "pnpm -r --parallel run dev",

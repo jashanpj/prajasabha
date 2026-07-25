@@ -4,3 +4,4 @@ packages:
 
 allowBuilds:
   esbuild: true
+  "@biomejs/biome": true
