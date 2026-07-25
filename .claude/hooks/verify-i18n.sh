@@ -4,8 +4,8 @@
 # a recursive key-diff instead of `keys[]`.
 set -euo pipefail
 
-ML="src/i18n/ml.json"
-EN="src/i18n/en.json"
+ML="apps/web/src/i18n/ml.json"
+EN="apps/web/src/i18n/en.json"
 
 [ -f "$ML" ] && [ -f "$EN" ] || exit 0
 
