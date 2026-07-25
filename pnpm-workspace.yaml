@@ -5,3 +5,5 @@ packages:
 allowBuilds:
   esbuild: true
   "@biomejs/biome": true
+  sharp: true
+  workerd: true
