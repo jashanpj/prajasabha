@@ -9,6 +9,6 @@
   },
   "dev": {
     "port": 8788,
-    "inspector_port": 9230
+    "inspector_port": 19230
   }
 }
