@@ -1,0 +1,55 @@
+name: Story
+description: A PRD-derived user story with acceptance criteria
+title: "[Story] "
+labels: ["type:story"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Copy the Story and Acceptance Criteria directly from the PRD —
+        don't paraphrase. Claude Code reads these fields to derive its plan
+        and test list, so precision here saves review time later.
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      description: What is being built, and for whom.
+    validations:
+      required: true
+  - type: textarea
+    id: acs
+    attributes:
+      label: Acceptance criteria
+      description: Copied verbatim from the PRD.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      options:
+        - "A"
+        - "B"
+        - "C"
+        - "D"
+        - "E"
+        - "F"
+        - "G"
+        - "H"
+        - "I"
+        - "J"
+        - "K"
+        - "L"
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+  - type: textarea
+    id: test_notes
+    attributes:
+      label: Test notes

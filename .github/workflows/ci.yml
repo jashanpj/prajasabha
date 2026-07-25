@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: prajasabha_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Biome check
+        run: pnpm biome check .
+
+      - name: Type check
+        run: pnpm -r exec tsc --noEmit
+
+      - name: Migration dry-run
+        run: pnpm --filter db exec drizzle-kit check
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/prajasabha_test
+
+      - name: Unit + endpoint authz tests
+        run: pnpm -r test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/prajasabha_test
+
+      - name: i18n parity check
+        run: pnpm exec node scripts/check-i18n-parity.mjs
+
+      - name: Install Playwright (chromium only)
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Playwright smoke
+        run: pnpm exec playwright test --project=chromium tests/smoke
+
+      - name: Bundle-size budget
+        run: pnpm exec node scripts/check-bundle-budget.mjs

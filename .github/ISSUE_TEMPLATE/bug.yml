@@ -1,0 +1,50 @@
+name: Bug
+description: Something is broken
+title: "[Bug] "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      options:
+        - "A"
+        - "B"
+        - "C"
+        - "D"
+        - "E"
+        - "F"
+        - "G"
+        - "H"
+        - "I"
+        - "J"
+        - "K"
+        - "L"
+        - "Unknown"
+  - type: checkboxes
+    id: sensitive
+    attributes:
+      label: Sensitivity
+      options:
+        - label: This bug involves a security or privacy issue (identity/vault data, authz bypass). If checked, use a private security advisory instead of this public issue.

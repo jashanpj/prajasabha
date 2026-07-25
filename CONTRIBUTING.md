@@ -1,0 +1,58 @@
+# Contributing to PrajaSabha
+
+Thanks for contributing to a civic transparency platform. Before anything
+else, read `CLAUDE.md` at the repo root — its invariants are not style
+preferences, they're the reason the identity/participation separation in
+this system is trustworthy. If you use Claude Code (or another AI coding
+tool) locally, it will read the same file and enforce the same rules for
+you via the checked-in `.claude/agents` and `.claude/hooks`.
+
+## Getting started
+
+```bash
+git clone https://github.com/jashanpj/prajasabha.git
+cd prajasabha
+pnpm install
+docker compose up -d   # local Postgres + any other local-only deps
+pnpm dev
+```
+
+You don't need a Supabase or Cloudflare account to get a local dev loop
+running — those are only required for deploying, not for building.
+
+## Workflow
+
+- One issue → one branch (`<type>/<issue-number>-slug`) → one PR.
+  Reference `Closes #<issue>` in the PR description.
+- Copy Acceptance Criteria from the issue into the PR template and check
+  them off as you satisfy them.
+- Every user-facing string change touches both `src/i18n/ml.json` and
+  `src/i18n/en.json` in the same commit — Malayalam is the default locale.
+- Conventional Commits: `feat|fix|chore|docs(<module scope>): <summary>`,
+  e.g. `feat(delib): statement voting endpoint`.
+- Tests are colocated (Vitest). Every new endpoint needs an authz test;
+  every new append-only table needs an immutability test.
+
+## Sign your commits (DCO)
+
+We use a Developer Certificate of Origin instead of a CLA. Sign every
+commit:
+
+```bash
+git commit -s -m "feat(delib): statement voting endpoint"
+```
+
+This adds a `Signed-off-by` trailer certifying you have the right to submit
+the contribution under this project's license. PRs with unsigned commits
+will fail the DCO check.
+
+## Good first issues
+
+Look for the `good-first-issue` label. Issues use structured templates
+(Story/Acceptance Criteria/Module/Out of scope/Test notes) specifically so
+they're actionable without needing a design discussion first.
+
+## Security
+
+Do not open a public issue for a security vulnerability — see
+`SECURITY.md` for private reporting.
