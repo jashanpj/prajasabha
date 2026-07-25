@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+.astro/
+.output/
+.wrangler/
+build/
+
+# Env / secrets — never commit these (CLAUDE.md invariant: no secrets in code)
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+
+# TypeScript / test / coverage
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp
+
+# Local Claude Code permissions (personal, not shared config)
+.claude/settings.local.json
+
+# Design source exports — redact before committing (see issue #74:
+# real MP name used as sample data in the current export)
+Civic engagement platform design.zip
+*.dc.html.zip
