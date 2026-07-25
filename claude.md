@@ -24,6 +24,19 @@
 - Every sentiment display must render its sample-size caveat component.
 - Election-mode flag (KV) must gate any new sentiment-rendering path.
 
+## Design law (see docs/design-system.md for full detail)
+- Colors: Chakra Navy #1A2E5C (dominant), Saffron #E8862D + India Green
+  #1E7A46 (accents — saffron never appears without green nearby), Warm
+  Ivory #FAF9F6 (bg), Charcoal #22262B (text). Tricolour appears only as a
+  3px gradient accent line, never a solid block/background.
+- Type: Source Serif 4 (EN display/headings) / Noto Serif Malayalam (ML
+  headings); Public Sans (EN body/UI) / Noto Sans Malayalam (ML body/UI).
+- Logo: the 24-spoke wheel mark is original geometry — never render it as
+  (or close enough to be mistaken for) the State Emblem/Ashoka Chakra.
+- Status/identity chips: icon + label, never color alone (ties to the
+  product-law status strings above).
+- Tone: plain, respectful, non-inflammatory — facts over adjectives.
+
 ## Code standards
 - TypeScript strict; Zod at every boundary; Biome (don't hand-format).
 - Astro islands: no client directive by default; justify any client:load in
