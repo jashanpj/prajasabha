@@ -11,7 +11,7 @@
   // (docker-compose) and CI (Vitest, running in Node) are unaffected.
   "compatibility_flags": ["nodejs_compat"],
   "dev": {
-    "port": 8788,
-    "inspector_port": 19230
+    "port": 8789,
+    "inspector_port": 19231
   }
 }
