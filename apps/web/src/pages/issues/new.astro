@@ -118,6 +118,7 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
     <section id="published" hidden>
       <h2>{t["issue.new.published.title"]}</h2>
       <p>{t["issue.new.published.body"]}</p>
+      <a id="published-issue-link" href="#">{t["issue.new.published.viewLink"]}</a>
     </section>
 
     <script define:vars={{ t }} type="module">
@@ -297,6 +298,8 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
 
           const res = await fetch(`/api/issues/${issueId}/publish`, { method: "POST" });
           if (res.status === 200) {
+            const { slug } = await res.json();
+            document.getElementById("published-issue-link").href = `/issues/${slug}`;
             issueForm.hidden = true;
             publishedSection.hidden = false;
             return;

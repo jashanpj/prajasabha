@@ -86,7 +86,10 @@ describe("handleVerify (GET /api/auth/register/verify)", () => {
 
     const res = await callVerify("valid-token", env);
     expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toBeTruthy();
+    // Issue #86 — the actual fix: this must land the freshly-verified
+    // member on the next actionable step (EPIC verification), not the
+    // placeholder home page.
+    expect(res.headers.get("location")).toBe("/verify/epic");
 
     const setCookie = res.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("ps_session=");

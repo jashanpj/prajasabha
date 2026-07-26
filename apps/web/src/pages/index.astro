@@ -1,17 +1,66 @@
 ---
-import { APP_NAME } from "shared";
+import { APP_NAME, verifySession } from "shared";
+import Button from "../components/Button.astro";
 import Logo from "../components/Logo.astro";
 import TricolourHairline from "../components/TricolourHairline.astro";
 import "../styles/global.css";
+import { schema } from "db";
+import { eq } from "drizzle-orm";
+import en from "../i18n/en.json";
 import ml from "../i18n/ml.json";
+import { getServiceRoleDb } from "../lib/db";
 
-// Locale routing/detection is a later story — this scaffold just proves
-// the i18n file pair and the workspace import resolve for real, rendering
-// Malayalam (the default locale per CLAUDE.md) directly.
-const tagline = ml["home.tagline"];
+// Home landing page (issue #86 — wire up navigation). Session-aware
+// call-to-action, three states — mirrors the DEV-fallback session/DB
+// pattern already established in pages/issues/[slug].astro and
+// pages/verify/epic.astro, no new pattern introduced. T1/Aadhaar is
+// postponed (todo.md) — EPIC verification is the only path from T0 to
+// full participation and flips tier straight to 't2'
+// (apps/web/src/pages/api/verify/epic/status.ts) — so "not yet t2" is
+// the only intermediate state worth branching on here.
+const locale = Astro.url.searchParams.get("lang") === "en" ? "en" : "ml";
+const t: Record<string, string> = locale === "en" ? en : ml;
+
+const sessionCookieValue = Astro.cookies.get("ps_session")?.value;
+const env = import.meta.env.DEV ? undefined : (await import("cloudflare:workers")).env;
+const sessionSecret = import.meta.env.DEV
+  ? "local-dev-session-secret-do-not-use-in-prod"
+  : env?.SESSION_SECRET;
+const session =
+  sessionCookieValue && sessionSecret
+    ? await verifySession(sessionCookieValue, sessionSecret)
+    : null;
+
+let tier: "t0" | "t1" | "t2" | null = null;
+if (session) {
+  const appDatabaseUrl = import.meta.env.DEV
+    ? "postgres://app_role:app_role_dev_only@localhost:5432/prajasabha_dev"
+    : env?.APP_DATABASE_URL;
+  const db = getServiceRoleDb(appDatabaseUrl as string);
+  const [member] = await db
+    .select({ tier: schema.members.tier })
+    .from(schema.members)
+    .where(eq(schema.members.memberId, session.memberId))
+    .limit(1);
+  tier = member?.tier ?? null;
+}
+
+const cta = !session
+  ? {
+      href: `/register?lang=${locale}`,
+      label: t["home.cta.register"],
+      body: t["home.cta.register.body"],
+    }
+  : tier === "t2"
+    ? { href: "/issues/new", label: t["home.cta.raiseIssue"], body: t["home.cta.raiseIssue.body"] }
+    : {
+        href: "/verify/epic",
+        label: t["home.cta.verifyEpic"],
+        body: t["home.cta.verifyEpic.body"],
+      };
 ---
 
-<html lang="ml">
+<html lang={locale}>
   <head>
     <meta charset="utf-8" />
     <title>{APP_NAME}</title>
@@ -22,6 +71,8 @@ const tagline = ml["home.tagline"];
       <h1>{APP_NAME}</h1>
     </header>
     <TricolourHairline />
-    <p>{tagline}</p>
+    <p>{t["home.tagline"]}</p>
+    <p>{cta.body}</p>
+    <Button href={cta.href}>{cta.label}</Button>
   </body>
 </html>
