@@ -50,6 +50,16 @@ h2 {
   max-width: 28em;
 }
 
+/* .ps-form's `display: flex` ties the native [hidden] UA rule's
+   specificity and wins on cascade order (author styles beat the UA
+   stylesheet) — without this, a [hidden] .ps-form would incorrectly
+   render. Same fix applies to .ps-card, used directly on <section
+   hidden> in issues/new.astro's step 3. */
+.ps-form[hidden],
+.ps-card[hidden] {
+  display: none;
+}
+
 .ps-form label {
   display: flex;
   flex-direction: column;
