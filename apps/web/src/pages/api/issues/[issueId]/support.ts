@@ -27,6 +27,14 @@ import { getServiceRoleDb } from "../../../../lib/db";
 // supportT2Count has just crossed loadConfig().concernThresholdT2 and
 // promotedAt is still unset; only then does a single
 // issue_promoted_to_concern event_log row fire (see below).
+//
+// C3 — Deliberation Lifecycle (issue #35): the same promotion also opens
+// the Concern's deliberation (state='open', closesAt = now() +
+// DELIBERATION_OPEN_DAYS) in the same transaction, so a Concern is never
+// observably "promoted but not yet in deliberation" — this is the only
+// place a deliberation is ever opened. deliberations.issueId's own unique
+// constraint is a second guard, on top of the promotion CAS, against ever
+// double-opening one for the same issue.
 
 const POSTGRES_UNIQUE_VIOLATION = "23505";
 
@@ -132,7 +140,9 @@ export async function handleSupport(
   // with no corresponding event (a silently dropped promotion) — both
   // commit together or neither does, matching #26's merge.ts transaction
   // precedent.
-  const { concernThresholdT2 } = loadConfig(env as unknown as Record<string, string | undefined>);
+  const { concernThresholdT2, deliberationOpenDays } = loadConfig(
+    env as unknown as Record<string, string | undefined>,
+  );
   await db.transaction(async (tx) => {
     const [promoted] = await tx
       .update(schema.issues)
@@ -152,6 +162,17 @@ export async function handleSupport(
         subjectType: "issue",
         subjectId: issueId,
         payload: { supportT2Count: promoted.supportT2Count },
+      });
+
+      await tx.insert(schema.deliberations).values({
+        issueId,
+        closesAt: sql`now() + ${deliberationOpenDays} * interval '1 day'`,
+      });
+      await tx.insert(schema.eventLog).values({
+        kind: "deliberation_opened",
+        subjectType: "issue",
+        subjectId: issueId,
+        payload: {},
       });
     }
   });

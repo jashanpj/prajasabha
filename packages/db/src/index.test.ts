@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { createDbClient, schema } from "./index";
 
 describe("packages/db entrypoint", () => {
-  it("exports the 7 core participation tables and their enums", () => {
+  it("exports the core participation tables and their enums", () => {
     expect(Object.keys(schema).sort()).toEqual(
       [
         "authorities",
         "authorityKindEnum",
+        // Issue #35 — C3 Deliberation Lifecycle.
+        "deliberationStateEnum",
+        "deliberations",
         "eventLog",
         "issueStatusEnum",
         "issueSupport",

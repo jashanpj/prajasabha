@@ -4,11 +4,34 @@
   "main": "./src/index.ts",
   "compatibility_date": "2025-01-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Security review finding (issue #35): this Worker's POST /internal/sweep
+  // is gated by only ONE factor (JOBS_INTERNAL_TOKEN — see src/index.ts) —
+  // no IP allowlist, unlike apps/web's admin endpoints. That's only safe if
+  // this Worker is genuinely unreachable except via the JOBS_SVC service
+  // binding, never at a public *.workers.dev URL. `workers_dev: false`
+  // (no `routes` configured either) is what makes that true — do not
+  // remove this without adding a second auth factor to /internal/sweep.
+  "workers_dev": false,
+  // Issue #35 — C3 Deliberation Lifecycle. Daily is enough granularity for
+  // a 14-day-default window; see apps/jobs/src/lifecycle-sweep.ts for the
+  // actual Open->Closed->Summarized logic this triggers.
   "triggers": {
-    "crons": []
+    "crons": ["0 3 * * *"]
   },
+  // Needs a real bucket per environment
+  // (`wrangler r2 bucket create prajasabha-deliberation-artifacts`) before
+  // deploying — local `wrangler dev` emulates it. Stores the generated
+  // consensus-summary PDFs (packages/shared's generateDeliberationSummaryPdf);
+  // the R2 key is recorded on deliberations.summary_artifact_key.
+  "r2_buckets": [
+    { "binding": "DELIBERATION_ARTIFACTS", "bucket_name": "prajasabha-deliberation-artifacts" }
+  ],
   "dev": {
     "port": 8788,
     "inspector_port": 19230
   }
+  // Secrets (never committed — set via `wrangler secret put <NAME>` per
+  // environment, or a gitignored .env/.dev.vars locally): APP_DATABASE_URL,
+  // CONSENSUS_AGREEMENT_THRESHOLD_PERCENT, CONSENSUS_MIN_VOTERS — see
+  // .env.example.
 }

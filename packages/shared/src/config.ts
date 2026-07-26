@@ -14,12 +14,24 @@ import { z } from "zod";
 // apps/vault-svc needs only loadMagicLinkConfig) — bundling them would
 // force every caller to declare vars it doesn't use.
 
-const CORE_REQUIRED_VARS = ["CONCERN_THRESHOLD_T2", "QUORUM_PERCENT", "PANEL_TERM_MONTHS"] as const;
+// DELIBERATION_OPEN_DAYS (issue #35 — C3) joins this bundle rather than
+// getting its own loader: it's a PRD/HLD product-law threshold exactly
+// like the other three, and its only consumer (support.ts's promotion CAS
+// transaction) already calls loadConfig() for concernThresholdT2 — so
+// bundling doesn't force any unrelated endpoint to declare a var it never
+// reads (the rationale the other loaders below are split by).
+const CORE_REQUIRED_VARS = [
+  "CONCERN_THRESHOLD_T2",
+  "QUORUM_PERCENT",
+  "PANEL_TERM_MONTHS",
+  "DELIBERATION_OPEN_DAYS",
+] as const;
 
 const CoreConfigSchema = z.object({
   concernThresholdT2: z.coerce.number().int().positive(),
   quorumPercent: z.coerce.number().min(0).max(100),
   panelTermMonths: z.coerce.number().int().positive(),
+  deliberationOpenDays: z.coerce.number().int().positive(),
 });
 
 export type AppConfig = z.infer<typeof CoreConfigSchema>;
@@ -30,7 +42,7 @@ function missingVarsError(missing: readonly string[]): Error {
   );
 }
 
-/** PRD/HLD product-law thresholds (concern threshold, quorum, panel term). */
+/** PRD/HLD product-law thresholds (concern threshold, quorum, panel term, deliberation window). */
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
   const missing = CORE_REQUIRED_VARS.filter((key) => env[key] === undefined);
   if (missing.length > 0) throw missingVarsError(missing);
@@ -39,6 +51,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     concernThresholdT2: env.CONCERN_THRESHOLD_T2,
     quorumPercent: env.QUORUM_PERCENT,
     panelTermMonths: env.PANEL_TERM_MONTHS,
+    deliberationOpenDays: env.DELIBERATION_OPEN_DAYS,
   });
 }
 
@@ -460,5 +473,70 @@ export function loadIssueMergeAdminConfig(
   return IssueMergeAdminConfigSchema.parse({
     adminToken: env.ISSUE_MERGE_ADMIN_TOKEN,
     ipAllowlist: env.ISSUE_MERGE_ADMIN_IP_ALLOWLIST,
+  });
+}
+
+// Issue #35/#34 (C3/C2) — the consensus agreement threshold and minimum
+// sample size are PRD-adjacent product thresholds ("Broad agreement" is
+// >=70% across >= a configurable N voters, per #34's own AC), so they get
+// the same "no silent fallback" env-driven treatment as concernThresholdT2
+// rather than a hardcoded 70/N literal (CLAUDE.md invariant 6). Split from
+// loadConfig() because this is consumed by a different set of files
+// (apps/jobs' lifecycle-sweep.ts starting in this PR, then apps/web's
+// consensus endpoint/page in #34) than support.ts's promotion bundle.
+
+const CONSENSUS_REQUIRED_VARS = [
+  "CONSENSUS_AGREEMENT_THRESHOLD_PERCENT",
+  "CONSENSUS_MIN_VOTERS",
+] as const;
+
+const ConsensusConfigSchema = z.object({
+  agreementThresholdPercent: z.coerce.number().min(0).max(100),
+  minVoters: z.coerce.number().int().positive(),
+});
+
+export type ConsensusConfig = z.infer<typeof ConsensusConfigSchema>;
+
+/** The "Broad agreement" threshold (>=X% across >=N voters) — issue #34's C2. */
+export function loadConsensusConfig(env: Record<string, string | undefined>): ConsensusConfig {
+  const missing = CONSENSUS_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return ConsensusConfigSchema.parse({
+    agreementThresholdPercent: env.CONSENSUS_AGREEMENT_THRESHOLD_PERCENT,
+    minVoters: env.CONSENSUS_MIN_VOTERS,
+  });
+}
+
+// Issue #35's demo-only manual sweep trigger (apps/web's
+// POST /api/admin/deliberations/sweep) — lets a stakeholder demo walk
+// through Open->Closed->Summarized same-day instead of waiting on the real
+// cron window. Same two-factor bearer-token + IP-allowlist shape as
+// loadIssueMergeAdminConfig, deliberately a separate loader/separate env
+// vars (not reused) since it gates a different endpoint with its own
+// blast radius (manually force-closing deliberations, not merging issues).
+
+const DELIBERATION_SWEEP_ADMIN_REQUIRED_VARS = [
+  "DELIBERATION_SWEEP_ADMIN_TOKEN",
+  "DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST",
+] as const;
+
+const DeliberationSweepAdminConfigSchema = z.object({
+  adminToken: z.string().min(1),
+  ipAllowlist: commaSeparatedList,
+});
+
+export type DeliberationSweepAdminConfig = z.infer<typeof DeliberationSweepAdminConfigSchema>;
+
+/** apps/web's POST /api/admin/deliberations/sweep bearer token + IP allowlist (demo tooling). */
+export function loadDeliberationSweepAdminConfig(
+  env: Record<string, string | undefined>,
+): DeliberationSweepAdminConfig {
+  const missing = DELIBERATION_SWEEP_ADMIN_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return DeliberationSweepAdminConfigSchema.parse({
+    adminToken: env.DELIBERATION_SWEEP_ADMIN_TOKEN,
+    ipAllowlist: env.DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST,
   });
 }

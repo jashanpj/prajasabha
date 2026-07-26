@@ -75,5 +75,18 @@ declare namespace Cloudflare {
     ISSUE_SUPPORT_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
     ISSUE_MERGE_ADMIN_TOKEN: string;
     ISSUE_MERGE_ADMIN_IP_ALLOWLIST: string;
+    // Issue #35 — C3 Deliberation Lifecycle. DELIBERATION_OPEN_DAYS is read
+    // by support.ts's loadConfig() when opening a deliberation atomically
+    // with promotion. DELIBERATION_SWEEP_ADMIN_TOKEN/_IP_ALLOWLIST gate the
+    // demo-only manual sweep-trigger endpoint (not part of any issue's
+    // literal AC — see POST /api/admin/deliberations/sweep).
+    DELIBERATION_OPEN_DAYS: string;
+    DELIBERATION_SWEEP_ADMIN_TOKEN: string;
+    DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST: string;
+    // Service binding to apps/jobs — the only way apps/web triggers the
+    // deliberation lifecycle sweep on demand, never a direct DB write of
+    // deliberation state from this app.
+    JOBS_SVC: Fetcher;
+    JOBS_INTERNAL_TOKEN: string;
   }
 }
