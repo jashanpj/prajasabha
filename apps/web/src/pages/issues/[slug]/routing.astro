@@ -133,7 +133,7 @@ const columns = [
   </head>
   <body>
     <SiteChrome locale={locale}>
-      <nav class="ps-breadcrumb" aria-label="Breadcrumb">
+      <nav class="ps-breadcrumb" aria-label={t["nav.breadcrumb.label"]}>
         <a href={`/issues/${slug}?lang=${locale}`}>{title}</a>
         <span aria-hidden="true">/</span>
         <span>{t["routing.breadcrumb.current"]}</span>

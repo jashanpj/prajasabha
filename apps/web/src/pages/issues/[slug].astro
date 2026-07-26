@@ -191,7 +191,7 @@ function timelineTimestamp(at: Date): string {
   </head>
   <body>
     <SiteChrome locale={locale}>
-      <nav class="ps-breadcrumb" aria-label="Breadcrumb">
+      <nav class="ps-breadcrumb" aria-label={t["nav.breadcrumb.label"]}>
         <a href={`/dashboard?lang=${locale}`}>{t["nav.dashboard"]}</a>
         <span aria-hidden="true">/</span>
         <span>{title}</span>
