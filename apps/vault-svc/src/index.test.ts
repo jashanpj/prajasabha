@@ -17,8 +17,11 @@ function testEnv(overrides: Partial<Bindings> = {}): Bindings {
     VAULT_SVC_DATABASE_URL: vaultSvcDatabaseUrl,
     // 32-byte (256-bit) test-only keys, base64 — sized correctly for
     // AES-GCM-256 / HMAC-SHA256, never used outside this test file.
-    EMAIL_ENCRYPTION_KEY: "1/Lk4Bz+5359putkUJ5SaMngEL9OYAkv109u6Ob3AsI=",
-    EMAIL_HASH_PEPPER: "oaVwhwJtJKcxMmx9J79PiRfI6EmsCoY/ysZs50jxXno=",
+    // Deliberately low-entropy (repeated-byte fill, not randomly
+    // generated) so they read as obviously-fake to gitleaks/a human, not
+    // a plausible leaked key.
+    EMAIL_ENCRYPTION_KEY: "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+    EMAIL_HASH_PEPPER: "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=",
     VAULT_SVC_INTERNAL_TOKEN: INTERNAL_TOKEN,
     MAGIC_LINK_TTL_MINUTES: "15",
     ...overrides,

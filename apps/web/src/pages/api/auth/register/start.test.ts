@@ -26,6 +26,18 @@ function fakeKv() {
   };
 }
 
+// Exact hostname match, never a substring check — `url.includes("host")`
+// would also match "evil.com/host" or "host.evil.com", which is exactly
+// the incomplete-URL-sanitization bug CodeQL flags this pattern for, even
+// in test-only mock routing like this.
+function hostnameIs(input: RequestInfo | URL, hostname: string): boolean {
+  try {
+    return new URL(String(input)).hostname === hostname;
+  } catch {
+    return false;
+  }
+}
+
 function fakeVaultSvc(response: { status: number; body: unknown }) {
   return {
     fetch: vi.fn(
@@ -76,14 +88,13 @@ let originalFetch: typeof fetch;
 beforeEach(() => {
   originalFetch = global.fetch;
   global.fetch = vi.fn(async (input: RequestInfo | URL) => {
-    const url = String(input);
-    if (url.includes("challenges.cloudflare.com")) {
+    if (hostnameIs(input, "challenges.cloudflare.com")) {
       return new Response(JSON.stringify({ success: true }), { status: 200 });
     }
-    if (url.includes("api.resend.com")) {
+    if (hostnameIs(input, "api.resend.com")) {
       return new Response(JSON.stringify({ id: "email-1" }), { status: 200 });
     }
-    throw new Error(`Unexpected fetch call to ${url}`);
+    throw new Error(`Unexpected fetch call to ${String(input)}`);
   }) as typeof fetch;
 });
 
@@ -108,11 +119,10 @@ describe("handleStart (POST /api/auth/register/start)", () => {
 
   it("rejects when Turnstile verification fails", async () => {
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("challenges.cloudflare.com")) {
+      if (hostnameIs(input, "challenges.cloudflare.com")) {
         return new Response(JSON.stringify({ success: false }), { status: 200 });
       }
-      throw new Error(`Unexpected fetch call to ${url}`);
+      throw new Error(`Unexpected fetch call to ${String(input)}`);
     }) as typeof fetch;
 
     const res = await callStart(validBody, testEnv());
@@ -197,14 +207,13 @@ describe("handleStart (POST /api/auth/register/start)", () => {
 
   it("returns 500 when the email send fails", async () => {
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("challenges.cloudflare.com")) {
+      if (hostnameIs(input, "challenges.cloudflare.com")) {
         return new Response(JSON.stringify({ success: true }), { status: 200 });
       }
-      if (url.includes("api.resend.com")) {
+      if (hostnameIs(input, "api.resend.com")) {
         return new Response("error", { status: 500 });
       }
-      throw new Error(`Unexpected fetch call to ${url}`);
+      throw new Error(`Unexpected fetch call to ${String(input)}`);
     }) as typeof fetch;
 
     const res = await callStart(validBody, testEnv());
