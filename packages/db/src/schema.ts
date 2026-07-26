@@ -87,6 +87,13 @@ export const issues = pgTable(
     category: text("category").notNull(),
     wardId: uuid("ward_id").notNull(),
     status: issueStatusEnum("status").notNull().default("draft"),
+    // Added in migration 0004 (issue #24's B1 photo upload). R2 object keys
+    // (issues/{issueId}/{uuid}.{ext}) only — R2 is the blob store, PG is
+    // the index (HLD §1). Bytes are EXIF/GPS-stripped by the endpoint
+    // BEFORE the R2 put, so nothing location-bearing is ever persisted.
+    // Capped at 5 keys, enforced at the endpoint (a CHECK on array length
+    // would bake a product threshold into the schema — config, not DDL).
+    photoKeys: text("photo_keys").array().notNull().default(sql`'{}'::text[]`),
     mergedInto: uuid("merged_into"),
     supportT2Count: integer("support_t2_count").notNull().default(0),
     createdBy: uuid("created_by")

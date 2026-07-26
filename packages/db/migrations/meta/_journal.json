@@ -29,6 +29,13 @@
       "when": 1785049288852,
       "tag": "0003_add_member_assembly_segment",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785054316423,
+      "tag": "0004_add_issue_photo_keys",
+      "breakpoints": true
     }
   ]
 }

@@ -49,5 +49,22 @@ declare namespace Cloudflare {
     // "already verified by someone else" (409 duplicate_epic), so it's
     // rate-limited per-member, not just Turnstile-gated upstream.
     EPIC_LINK_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
+    // Issue #24 — B1 Raise an Issue. R2 bucket for EXIF-stripped evidence
+    // photos (keys recorded in issues.photo_keys), plus the config-driven
+    // category/ward allow-lists (loadIssueCategoriesConfig /
+    // loadPilotWardsConfig) that publish-time validation and the form's
+    // <select>s read.
+    ISSUE_PHOTOS: R2Bucket;
+    ISSUE_CATEGORIES: string;
+    PILOT_WARD_IDS: string;
+    PILOT_WARD_NAMES_ML: string;
+    PILOT_WARD_NAMES_EN: string;
+    // Per-member hourly limits for create/draft/photos/publish
+    // (loadIssueRateLimitConfig) — session-authed, so no Turnstile, but
+    // still rate-limited like every other mutation endpoint here.
+    ISSUE_CREATE_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
+    ISSUE_DRAFT_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
+    ISSUE_PHOTO_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
+    ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
   }
 }

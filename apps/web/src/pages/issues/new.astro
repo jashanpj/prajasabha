@@ -1,0 +1,280 @@
+---
+import Button from "../../components/Button.astro";
+import Logo from "../../components/Logo.astro";
+import TricolourHairline from "../../components/TricolourHairline.astro";
+import "../../styles/global.css";
+import en from "../../i18n/en.json";
+import ml from "../../i18n/ml.json";
+
+// B1 — Raise an Issue form (issue #24). Plain HTML + vanilla progressive-
+// enhancement JS, zero Astro islands (no client:* directive — CLAUDE.md's
+// Astro rule). Flow matches the endpoints' contract:
+//   1. pick a ward → POST /api/issues/create (the only required field) →
+//      a draft exists;
+//   2. every input change is autosaved ~800ms debounced via
+//      PATCH /api/issues/{id}/draft — leaving and coming back loses nothing;
+//   3. photos POST to /api/issues/{id}/photos one at a time (max 5; the
+//      server sniffs mime from bytes and strips EXIF/GPS before storing);
+//   4. Publish → POST /api/issues/{id}/publish — the server re-validates
+//      the saved draft against the category/ward allow-lists and only then
+//      makes it public.
+// Category codes come from config (loadIssueCategoriesConfig's env var) —
+// labels are looked up as i18n `issue.category.{code}` with the raw code
+// as fallback, so a config-added category renders (untranslated) rather
+// than breaking the form.
+const locale = Astro.url.searchParams.get("lang") === "en" ? "en" : "ml";
+const t: Record<string, string> = locale === "en" ? en : ml;
+
+// Same DEV-fallback pattern as register.astro's sitekey/TTL: placeholder
+// values for `astro dev` (mirroring .env.example), real config from
+// cloudflare:workers env everywhere else.
+const DEV_CATEGORIES = ["roads", "water", "electricity", "waste", "streetlight", "other"];
+const DEV_WARDS = [
+  { id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", nameMl: "ടെസ്റ്റ് വാർഡ് 1", nameEn: "Test Ward 1" },
+  { id: "5b1b6e1e-1c1a-4e1a-9c1a-2c963f66afa6", nameMl: "ടെസ്റ്റ് വാർഡ് 2", nameEn: "Test Ward 2" },
+];
+
+let categories = DEV_CATEGORIES;
+let wards = DEV_WARDS;
+if (!import.meta.env.DEV) {
+  const { env } = await import("cloudflare:workers");
+  const { loadIssueCategoriesConfig, loadPilotWardsConfig } = await import("shared");
+  const configEnv = env as unknown as Record<string, string | undefined>;
+  categories = loadIssueCategoriesConfig(configEnv).issueCategories;
+  wards = loadPilotWardsConfig(configEnv).pilotWards;
+}
+
+const categoryLabel = (code: string): string => t[`issue.category.${code}`] ?? code;
+const wardLabel = (ward: (typeof wards)[number]): string =>
+  locale === "en" ? ward.nameEn : ward.nameMl;
+---
+
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t["issue.new.title"]}</title>
+  </head>
+  <body>
+    <header>
+      <Logo size={40} />
+      <h1>{t["issue.new.title"]}</h1>
+    </header>
+    <TricolourHairline />
+
+    <!-- Step 1: ward → create draft -->
+    <form id="start-form">
+      <label>
+        {t["issue.new.ward.label"]}
+        <select name="wardId" required>
+          {wards.map((ward) => <option value={ward.id}>{wardLabel(ward)}</option>)}
+        </select>
+      </label>
+      <p id="start-error" role="alert" hidden></p>
+      <Button type="submit">{t["issue.new.start"]}</Button>
+    </form>
+
+    <!-- Step 2: the draft form (revealed once the draft row exists) -->
+    <form id="issue-form" hidden>
+      <label>
+        {t["issue.new.titleMl.label"]}
+        <input type="text" name="titleMl" maxlength="200" required />
+      </label>
+      <label>
+        {t["issue.new.titleEn.label"]}
+        <input type="text" name="titleEn" maxlength="200" required />
+      </label>
+      <label>
+        {t["issue.new.body.label"]}
+        <textarea name="body" maxlength="5000" rows="6" required></textarea>
+      </label>
+      <label>
+        {t["issue.new.category.label"]}
+        <select name="category" required>
+          <option value="" disabled selected>{t["issue.new.category.choose"]}</option>
+          {categories.map((code) => <option value={code}>{categoryLabel(code)}</option>)}
+        </select>
+      </label>
+
+      <fieldset>
+        <legend>{t["issue.new.photos.label"]}</legend>
+        <p>{t["issue.new.photos.hint"]}</p>
+        <p class="ps-warning" role="note">{t["issue.new.photos.piiWarning"]}</p>
+        <input type="file" id="photo-input" accept="image/jpeg,image/png" />
+        <p id="photo-count" aria-live="polite"></p>
+      </fieldset>
+
+      <p id="autosave-status" aria-live="polite"></p>
+      <p id="issue-error" role="alert" hidden></p>
+      <Button type="submit">{t["issue.new.publish"]}</Button>
+    </form>
+
+    <!-- Step 3: published confirmation -->
+    <section id="published" hidden>
+      <h2>{t["issue.new.published.title"]}</h2>
+      <p>{t["issue.new.published.body"]}</p>
+    </section>
+
+    <script define:vars={{ t }} type="module">
+      const startForm = document.getElementById("start-form");
+      const startError = document.getElementById("start-error");
+      const issueForm = document.getElementById("issue-form");
+      const issueError = document.getElementById("issue-error");
+      const autosaveStatus = document.getElementById("autosave-status");
+      const photoInput = document.getElementById("photo-input");
+      const photoCount = document.getElementById("photo-count");
+      const publishedSection = document.getElementById("published");
+
+      let issueId = null;
+      let photosAdded = 0;
+      let debounceTimer = null;
+
+      const message = (code) => t[`issue.new.error.${code}`] ?? t["issue.new.error.generic"];
+
+      function showError(el, code) {
+        el.textContent = message(code);
+        el.hidden = false;
+      }
+
+      async function readErrorCode(res) {
+        const json = await res.json().catch(() => ({}));
+        return json.error ?? "generic";
+      }
+
+      // Step 1 — create the draft.
+      startForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        startError.hidden = true;
+        const button = startForm.querySelector("button[type=submit]");
+        button.disabled = true;
+        button.textContent = t["issue.new.starting"];
+        try {
+          const res = await fetch("/api/issues/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ wardId: new FormData(startForm).get("wardId") }),
+          });
+          if (res.status === 201) {
+            ({ issueId } = await res.json());
+            startForm.hidden = true;
+            issueForm.hidden = false;
+            return;
+          }
+          showError(startError, await readErrorCode(res));
+        } catch {
+          showError(startError, "generic");
+        } finally {
+          button.disabled = false;
+          button.textContent = t["issue.new.start"];
+        }
+      });
+
+      // Step 2a — debounced autosave (~800ms after the last change).
+      function scheduleAutosave(field, value) {
+        if (!issueId) return;
+        clearTimeout(debounceTimer);
+        autosaveStatus.textContent = t["issue.new.autosave.saving"];
+        debounceTimer = setTimeout(async () => {
+          try {
+            const res = await fetch(`/api/issues/${issueId}/draft`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ [field]: value }),
+            });
+            autosaveStatus.textContent = res.ok ? t["issue.new.autosave.saved"] : "";
+            if (!res.ok) showError(issueError, await readErrorCode(res));
+          } catch {
+            autosaveStatus.textContent = "";
+          }
+        }, 800);
+      }
+
+      for (const field of ["titleMl", "titleEn", "body", "category"]) {
+        const input = issueForm.elements[field];
+        input.addEventListener("input", () => {
+          issueError.hidden = true;
+          // An emptied field can't be autosaved (the schema rejects empty
+          // strings) — publish will catch a still-empty field server-side.
+          if (input.value !== "") scheduleAutosave(field, input.value);
+        });
+      }
+
+      // Step 2b — photo upload (one file per pick, max 5).
+      photoInput.addEventListener("change", async () => {
+        const file = photoInput.files?.[0];
+        photoInput.value = "";
+        if (!file || !issueId) return;
+        issueError.hidden = true;
+        try {
+          const buffer = await file.arrayBuffer();
+          let binary = "";
+          for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte);
+          const res = await fetch(`/api/issues/${issueId}/photos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ photoBase64: btoa(binary), filename: file.name }),
+          });
+          if (res.status === 201) {
+            photosAdded += 1;
+            photoCount.textContent = t["issue.new.photos.count"].replace("{count}", `${photosAdded}`);
+            if (photosAdded >= 5) photoInput.disabled = true;
+            return;
+          }
+          showError(issueError, await readErrorCode(res));
+        } catch {
+          showError(issueError, "generic");
+        }
+      });
+
+      // Step 3 — publish.
+      issueForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!issueId) return;
+        issueError.hidden = true;
+        const button = issueForm.querySelector("button[type=submit]");
+        button.disabled = true;
+        button.textContent = t["issue.new.publishing"];
+        try {
+          // Flush any still-debounced edit before publishing.
+          clearTimeout(debounceTimer);
+          const fields = {};
+          for (const field of ["titleMl", "titleEn", "body", "category"]) {
+            const value = issueForm.elements[field].value;
+            if (value !== "") fields[field] = value;
+          }
+          if (Object.keys(fields).length > 0) {
+            await fetch(`/api/issues/${issueId}/draft`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(fields),
+            });
+          }
+
+          const res = await fetch(`/api/issues/${issueId}/publish`, { method: "POST" });
+          if (res.status === 200) {
+            issueForm.hidden = true;
+            publishedSection.hidden = false;
+            return;
+          }
+          showError(issueError, await readErrorCode(res));
+        } catch {
+          showError(issueError, "generic");
+        } finally {
+          button.disabled = false;
+          button.textContent = t["issue.new.publish"];
+        }
+      });
+    </script>
+
+    <style>
+      /* Not color-only (design law: warning meaning must not rely on color
+         alone) — the border + bold text carry the signal; the saffron
+         accent is decorative only. */
+      .ps-warning {
+        border-left: 3px solid var(--color-saffron);
+        padding: 0.5em 0.75em;
+        font-weight: 600;
+      }
+    </style>
+  </body>
+</html>

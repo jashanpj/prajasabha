@@ -1,0 +1,1 @@
+ALTER TABLE "issues" ADD COLUMN "photo_keys" text[] DEFAULT '{}'::text[] NOT NULL;
