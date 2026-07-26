@@ -1,0 +1,168 @@
+---
+import AuthorityChip from "../components/AuthorityChip.astro";
+import SiteChrome from "../components/SiteChrome.astro";
+import "../styles/global.css";
+import { schema } from "db";
+import { desc, eq, sql } from "drizzle-orm";
+import en from "../i18n/en.json";
+import ml from "../i18n/ml.json";
+import { getServiceRoleDb } from "../lib/db";
+
+// Constituency dashboard (issue #90 — matches web/dashboard.dc.html's
+// "Constituency concerns" ranked list). Public read, same visibility rule
+// as issues/[slug].astro (status='published' — RLS's issues_public_read
+// policy doesn't gate this service-role connection, so it's re-checked in
+// application logic here too).
+//
+// Deliberately omitted vs. the mockup: "Active deliberations" (Module C)
+// and "Latest from your MP" (Module F) — neither has any backing data
+// model in this system yet, so they're left out rather than shown empty
+// or faked. No StatusChip per issue either — that tracks authority-
+// response state (Module F's tx_status_events), which no issue has ever
+// had; see #93/#90's issue bodies for the full reasoning.
+const locale = Astro.url.searchParams.get("lang") === "en" ? "en" : "ml";
+const t: Record<string, string> = locale === "en" ? en : ml;
+
+const env = import.meta.env.DEV ? undefined : (await import("cloudflare:workers")).env;
+const appDatabaseUrl = import.meta.env.DEV
+  ? "postgres://app_role:app_role_dev_only@localhost:5432/prajasabha_dev"
+  : env?.APP_DATABASE_URL;
+const db = getServiceRoleDb(appDatabaseUrl as string);
+
+const TOP_ISSUES_LIMIT = 5;
+
+const topIssues = await db
+  .select({
+    issueId: schema.issues.issueId,
+    slug: schema.issues.slug,
+    titleMl: schema.issues.titleMl,
+    titleEn: schema.issues.titleEn,
+    supportT2Count: schema.issues.supportT2Count,
+  })
+  .from(schema.issues)
+  .where(eq(schema.issues.status, "published"))
+  .orderBy(desc(schema.issues.supportT2Count))
+  .limit(TOP_ISSUES_LIMIT);
+
+const [{ publishedCount }] = await db
+  .select({ publishedCount: sql<number>`count(*)`.mapWith(Number) })
+  .from(schema.issues)
+  .where(eq(schema.issues.status, "published"));
+
+const responsibleAuthorityByIssue = new Map<string, { nameMl: string; nameEn: string }>();
+if (topIssues.length > 0) {
+  const routingRows = await db
+    .select({
+      issueId: schema.routings.issueId,
+      authorityNameMl: schema.authorities.nameMl,
+      authorityNameEn: schema.authorities.nameEn,
+    })
+    .from(schema.routings)
+    .innerJoin(schema.authorities, eq(schema.routings.authorityId, schema.authorities.authorityId))
+    .where(eq(schema.routings.role, "responsible"));
+  for (const row of routingRows) {
+    if (!responsibleAuthorityByIssue.has(row.issueId)) {
+      responsibleAuthorityByIssue.set(row.issueId, {
+        nameMl: row.authorityNameMl,
+        nameEn: row.authorityNameEn,
+      });
+    }
+  }
+}
+
+function issueTitle(issue: (typeof topIssues)[number]): string {
+  return locale === "en" ? issue.titleEn : issue.titleMl;
+}
+function authorityName(authority: { nameMl: string; nameEn: string }): string {
+  return locale === "en" ? authority.nameEn : authority.nameMl;
+}
+---
+
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t["dashboard.title"]}</title>
+  </head>
+  <body>
+    <SiteChrome locale={locale}>
+      <h1>{t["dashboard.title"]}</h1>
+
+      <section class="ps-concerns">
+        <h2>{t["dashboard.concerns.title"]}</h2>
+        {
+          topIssues.length === 0 ? (
+            <p>{t["dashboard.concerns.empty"]}</p>
+          ) : (
+            <ol class="ps-concerns__list">
+              {topIssues.map((issue) => {
+                const authority = responsibleAuthorityByIssue.get(issue.issueId);
+                return (
+                  <li class="ps-card">
+                    <a href={`/issues/${issue.slug}?lang=${locale}`} class="ps-concerns__title">
+                      {issueTitle(issue)}
+                    </a>
+                    <p class="ps-concerns__support tabular-nums">
+                      {t["dashboard.concerns.supportCount"].replace(
+                        "{count}",
+                        `${issue.supportT2Count}`,
+                      )}
+                    </p>
+                    {authority && (
+                      <AuthorityChip
+                        role="responsible"
+                        authorityName={authorityName(authority)}
+                        roleLabel={t["issue.routing.role.responsible"]}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )
+        }
+        <p class="ps-concerns__total">
+          {t["dashboard.concerns.total"].replace("{count}", `${publishedCount}`)}
+        </p>
+      </section>
+    </SiteChrome>
+  </body>
+</html>
+
+<style>
+  .ps-concerns {
+    padding: 1.5em;
+  }
+  .ps-concerns__list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+  }
+  .ps-card {
+    background: var(--color-card-fill);
+    border: 1px solid var(--color-card-border);
+    border-radius: var(--radius-card);
+    padding: 1em 1.25em;
+  }
+  .ps-concerns__title {
+    display: block;
+    font-family: var(--font-family-heading);
+    font-weight: var(--font-weight-heading);
+    font-size: var(--font-size-heading);
+    color: var(--color-charcoal);
+    text-decoration: none;
+    margin-bottom: 0.3em;
+  }
+  .ps-concerns__support {
+    color: var(--color-muted);
+    font-size: var(--font-size-body);
+    margin: 0 0 0.5em;
+  }
+  .ps-concerns__total {
+    color: var(--color-muted);
+    font-size: var(--font-size-caption);
+    margin-top: 1em;
+  }
+</style>

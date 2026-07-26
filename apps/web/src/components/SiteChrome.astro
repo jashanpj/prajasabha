@@ -86,11 +86,10 @@ const mlHref = `${currentPath}?lang=ml`;
     <a href={withLang("/")} aria-current={currentPath === "/" ? "page" : undefined}
       >{t["nav.home"]}</a
     >
-    {
-      /* Dashboard nav link added in #90, once apps/web/src/pages/dashboard.astro
-         actually exists — omitted here rather than dead-linked (see #88's
-         "nav links only to pages that exist today"). */
-    }
+    <a
+      href={withLang("/dashboard")}
+      aria-current={currentPath === "/dashboard" ? "page" : undefined}>{t["nav.dashboard"]}</a
+    >
   </div>
   <div class="ps-nav__right">
     <div class="ps-nav__lang">

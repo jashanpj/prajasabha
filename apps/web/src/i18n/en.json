@@ -1,6 +1,12 @@
 {
   "nav.home": "Home",
+  "nav.dashboard": "Dashboard",
   "nav.cta.verify": "Verify to participate",
+  "dashboard.title": "Constituency dashboard",
+  "dashboard.concerns.title": "Constituency concerns",
+  "dashboard.concerns.empty": "No issues have been published yet.",
+  "dashboard.concerns.supportCount": "{count} T2-verified supporters",
+  "dashboard.concerns.total": "{count} issues total",
   "footer.disclaimer": "Praja is an independent civic platform. It is not affiliated with any government body or political party.",
   "home.tagline": "Your constituency. Your voice. On the record.",
   "home.hero.subcopy": "Raise a local issue, and PrajaSabha routes it to the authority actually responsible — with the routing and the outcome both on the public record.",
