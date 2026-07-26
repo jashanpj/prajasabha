@@ -1,0 +1,237 @@
+---
+import { getEntry } from "astro:content";
+import AuthorityChip from "../../components/AuthorityChip.astro";
+import Logo from "../../components/Logo.astro";
+import TricolourHairline from "../../components/TricolourHairline.astro";
+import "../../styles/global.css";
+import { schema } from "db";
+import { eq } from "drizzle-orm";
+import { verifySession } from "shared";
+import en from "../../i18n/en.json";
+import ml from "../../i18n/ml.json";
+import { getServiceRoleDb } from "../../lib/db";
+
+// B2 — public issue-detail page (issue #25). Didn't exist before this
+// story (#24 only built the raise-a-new-issue form) — #28's Issue
+// Timeline extends this same page with the event-log timeline later,
+// not duplicated here. Public: no session required to VIEW a published
+// issue (matches the issues_public_read/routings_public_read RLS
+// policies from migration 0000 — this page just needs to enforce the
+// same status='published' visibility in application logic too, since it
+// reads via service_role, which RLS doesn't gate). Flagging misrouting
+// DOES require a session (session-gated form vs. a sign-in prompt).
+const locale = Astro.url.searchParams.get("lang") === "en" ? "en" : "ml";
+const t: Record<string, string> = locale === "en" ? en : ml;
+
+function notFoundResponse(): Response {
+  return new Response(
+    `<!doctype html><html lang="${locale}"><body><p>${t["issue.detail.notFound"]}</p></body></html>`,
+    {
+      status: 404,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    },
+  );
+}
+
+const slug = Astro.params.slug;
+if (!slug) {
+  return notFoundResponse();
+}
+
+// Same DEV-fallback pattern as verify/epic.astro's sessionSecret/siteKey:
+// literal values matching .env.example for `astro dev`, real Cloudflare
+// bindings everywhere else (`cloudflare:workers` doesn't resolve under
+// plain `astro dev`).
+const env = import.meta.env.DEV ? undefined : (await import("cloudflare:workers")).env;
+const appDatabaseUrl = import.meta.env.DEV
+  ? "postgres://app_role:app_role_dev_only@localhost:5432/prajasabha_dev"
+  : env?.APP_DATABASE_URL;
+const sessionSecret = import.meta.env.DEV
+  ? "local-dev-session-secret-do-not-use-in-prod"
+  : env?.SESSION_SECRET;
+
+const sessionCookieValue = Astro.cookies.get("ps_session")?.value;
+const session =
+  sessionCookieValue && sessionSecret
+    ? await verifySession(sessionCookieValue, sessionSecret)
+    : null;
+
+const db = getServiceRoleDb(appDatabaseUrl as string);
+const [issue] = await db
+  .select({
+    issueId: schema.issues.issueId,
+    titleMl: schema.issues.titleMl,
+    titleEn: schema.issues.titleEn,
+    body: schema.issues.body,
+    category: schema.issues.category,
+    status: schema.issues.status,
+  })
+  .from(schema.issues)
+  .where(eq(schema.issues.slug, slug))
+  .limit(1);
+
+if (!issue || issue.status !== "published") {
+  return notFoundResponse();
+}
+
+const routingRows = await db
+  .select({
+    role: schema.routings.role,
+    legalBasisRef: schema.routings.legalBasisRef,
+    authorityNameMl: schema.authorities.nameMl,
+    authorityNameEn: schema.authorities.nameEn,
+  })
+  .from(schema.routings)
+  .innerJoin(schema.authorities, eq(schema.routings.authorityId, schema.authorities.authorityId))
+  .where(eq(schema.routings.issueId, issue.issueId));
+
+function authorityName(row: (typeof routingRows)[number]): string {
+  return locale === "en" ? row.authorityNameEn : row.authorityNameMl;
+}
+function roleLabel(role: "responsible" | "copied"): string {
+  return role === "responsible"
+    ? t["issue.routing.role.responsible"]
+    : t["issue.routing.role.copied"];
+}
+
+const distinctLegalBasisRefs = [
+  ...new Set(
+    routingRows.map((row) => row.legalBasisRef).filter((ref): ref is string => ref !== null),
+  ),
+];
+const explainerEntries = await Promise.all(
+  distinctLegalBasisRefs.map((ref) => getEntry("routingExplainers", ref)),
+);
+const explainers = explainerEntries.filter((entry) => entry !== undefined);
+
+const title = locale === "en" ? issue.titleEn : issue.titleMl;
+const categoryLabel = t[`issue.category.${issue.category}`] ?? issue.category;
+const memberId = session?.memberId ?? null;
+---
+
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header>
+      <Logo size={40} />
+      <h1>{title}</h1>
+    </header>
+    <TricolourHairline />
+
+    <p class="ps-issue-category">{categoryLabel}</p>
+    <p class="ps-issue-body">{issue.body}</p>
+
+    <section>
+      <h2>{t["issue.detail.routing.title"]}</h2>
+      {
+        routingRows.length === 0 ? (
+          <p>{t["issue.detail.routing.empty"]}</p>
+        ) : (
+          <ul class="ps-routing-list">
+            {routingRows.map((row) => (
+              <li>
+                <AuthorityChip
+                  role={row.role}
+                  authorityName={authorityName(row)}
+                  roleLabel={roleLabel(row.role)}
+                />
+              </li>
+            ))}
+          </ul>
+        )
+      }
+
+      {
+        explainers.map((entry) => (
+          <div class="ps-explainer-card">
+            <h3>{locale === "en" ? entry.data.titleEn : entry.data.titleMl}</h3>
+            <p>{locale === "en" ? entry.data.bodyEn : entry.data.bodyMl}</p>
+          </div>
+        ))
+      }
+    </section>
+
+    <section>
+      {
+        memberId ? (
+          <form id="flag-form">
+            <label>
+              {t["issue.detail.flag.note.label"]}
+              <textarea name="note" maxlength="500" rows="3" />
+            </label>
+            <p id="flag-error" role="alert" hidden />
+            <p id="flag-success" role="status" hidden>
+              {t["issue.detail.flag.success"]}
+            </p>
+            <button type="submit">{t["issue.detail.flag.button"]}</button>
+          </form>
+        ) : (
+          <p>{t["issue.detail.flag.loginPrompt"]}</p>
+        )
+      }
+    </section>
+
+    <script define:vars={{ t, issueId: issue.issueId }} type="module">
+      const form = document.getElementById("flag-form");
+      if (form) {
+        const errorEl = document.getElementById("flag-error");
+        const successEl = document.getElementById("flag-success");
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          errorEl.hidden = true;
+          successEl.hidden = true;
+
+          const submitButton = form.querySelector("button[type=submit]");
+          submitButton.disabled = true;
+          const originalLabel = submitButton.textContent;
+          submitButton.textContent = t["issue.detail.flag.submitting"];
+
+          try {
+            const data = new FormData(form);
+            const res = await fetch(`/api/issues/${issueId}/flag-routing`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ note: data.get("note") || undefined }),
+            });
+
+            if (res.status === 201) {
+              successEl.hidden = false;
+              form.reset();
+              return;
+            }
+
+            const json = await res.json().catch(() => ({}));
+            errorEl.textContent = t[`issue.detail.flag.error.${json.error}`] ?? t["issue.detail.flag.error.generic"];
+            errorEl.hidden = false;
+          } catch {
+            errorEl.textContent = t["issue.detail.flag.error.generic"];
+            errorEl.hidden = false;
+          } finally {
+            submitButton.disabled = false;
+            submitButton.textContent = originalLabel;
+          }
+        });
+      }
+    </script>
+
+    <style>
+      .ps-routing-list {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5em;
+        padding: 0;
+      }
+      .ps-explainer-card {
+        border-left: 3px solid var(--color-navy);
+        padding: 0.5em 0.75em;
+        margin-top: 0.75em;
+      }
+    </style>
+  </body>
+</html>

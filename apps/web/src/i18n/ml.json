@@ -73,5 +73,19 @@
   "issue.category.electricity": "വൈദ്യുതി",
   "issue.category.waste": "മാലിന്യ സംസ്കരണം",
   "issue.category.streetlight": "തെരുവുവിളക്ക്",
-  "issue.category.other": "മറ്റുള്ളവ"
+  "issue.category.other": "മറ്റുള്ളവ",
+  "issue.routing.role.responsible": "ഉത്തരവാദിത്തം",
+  "issue.routing.role.copied": "കോപ്പി — അറിവിലേക്ക് മാത്രം",
+  "issue.detail.routing.title": "ആരാണ് ഉത്തരവാദി",
+  "issue.detail.routing.empty": "ഈ പ്രശ്നം ഇതുവരെ ഒരു അധികാരിക്ക് റൂട്ട് ചെയ്തിട്ടില്ല.",
+  "issue.detail.flag.button": "തെറ്റായ റൂട്ടിംഗ് ഫ്ലാഗ് ചെയ്യുക",
+  "issue.detail.flag.note.label": "എന്താണ് തെറ്റ്? (ഐച്ഛികം)",
+  "issue.detail.flag.submitting": "സമർപ്പിക്കുന്നു…",
+  "issue.detail.flag.success": "നന്ദി — ഇത് അഡ്മിൻ അവലോകനത്തിനായി അയച്ചിട്ടുണ്ട്.",
+  "issue.detail.flag.loginPrompt": "തെറ്റായ റൂട്ടിംഗ് ഫ്ലാഗ് ചെയ്യാൻ സൈൻ ഇൻ ചെയ്യുക.",
+  "issue.detail.flag.error.unauthorized": "ദയവായി ആദ്യം സൈൻ ഇൻ ചെയ്യുക.",
+  "issue.detail.flag.error.still_draft": "ഈ പ്രശ്നം ഇതുവരെ പ്രസിദ്ധീകരിച്ചിട്ടില്ല.",
+  "issue.detail.flag.error.rate_limited": "ഈ പ്രവർത്തനത്തിനുള്ള മണിക്കൂർ പരിധി കഴിഞ്ഞു. അൽപ്പസമയം കഴിഞ്ഞ് വീണ്ടും ശ്രമിക്കുക.",
+  "issue.detail.flag.error.generic": "എന്തോ പിഴവ് സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക.",
+  "issue.detail.notFound": "ഈ പ്രശ്നം നിലവിലില്ല അല്ലെങ്കിൽ ഇതുവരെ പ്രസിദ്ധീകരിച്ചിട്ടില്ല."
 }

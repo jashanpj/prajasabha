@@ -1,0 +1,100 @@
+---
+// Authority chip primitive (issue #25, B2 — Responsibility Router):
+// rectangular (6px radius, matches StatusChip.astro's shape convention —
+// NOT Badge.astro's pill shape, since this signals routing status, not
+// member identity).
+//
+// Per CLAUDE.md design law ("status/identity chips: icon + label, never
+// color alone"), 'responsible' vs 'copied' must be visible without relying
+// on color: a filled check-circle icon for an authority that is actually
+// responsible under law, vs an outline "i" info-circle icon for an
+// authority that is only copied for awareness. Label text differs too
+// (roleLabel), so the distinction survives grayscale/colorblind viewing.
+//
+// `roleLabel` is a pre-resolved, locale-appropriate string the caller
+// looks up from its own i18n dict (issue.routing.role.responsible /
+// issue.routing.role.copied) — this component does no i18n lookup of its
+// own, same pattern as Badge.astro's `label` prop.
+export interface Props {
+  role: "responsible" | "copied";
+  authorityName: string;
+  roleLabel: string;
+  class?: string;
+}
+
+const { role, authorityName, roleLabel, class: className } = Astro.props;
+---
+
+<span class:list={["ps-authority-chip", `ps-authority-chip--${role}`, className]} data-testid="ps-authority-chip">
+  {
+    role === "responsible" ? (
+      <span class="ps-authority-chip__icon ps-authority-chip__icon--solid" aria-hidden="true">
+        ✓
+      </span>
+    ) : (
+      <span class="ps-authority-chip__icon ps-authority-chip__icon--outline" aria-hidden="true">
+        i
+      </span>
+    )
+  }
+  <span class="ps-authority-chip__name">{authorityName}</span>
+  <span class="ps-authority-chip__role">{roleLabel}</span>
+</span>
+
+<style>
+  .ps-authority-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.3em 0.7em;
+    border-radius: var(--radius-status-chip);
+    border: 1px solid;
+    font-family: var(--font-family-body);
+    font-size: var(--font-size-caption);
+    font-weight: 500;
+  }
+  .ps-authority-chip__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 50%;
+    font-size: 0.85em;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .ps-authority-chip__icon--outline {
+    border: 1.5px solid currentColor;
+    font-style: italic;
+    font-weight: 700;
+  }
+  .ps-authority-chip__name {
+    font-weight: 600;
+  }
+  .ps-authority-chip__role {
+    color: var(--color-muted);
+  }
+
+  /* Responsible: solid filled check-circle, navy (primary statutory
+     authority for this issue). */
+  .ps-authority-chip--responsible {
+    color: var(--color-navy);
+    background: transparent;
+    border-color: var(--color-navy);
+  }
+  .ps-authority-chip--responsible .ps-authority-chip__icon--solid {
+    background: var(--color-navy);
+    color: var(--color-ivory);
+  }
+
+  /* Copied: outline info-circle, muted — visually de-emphasized relative
+     to the responsible authority, per docs/design-system.md's "copied for
+     information only is always rendered visually distinct from
+     responsible". */
+  .ps-authority-chip--copied {
+    color: var(--color-muted);
+    background: var(--status-no-response-fill);
+    border-color: var(--status-no-response-border);
+  }
+</style>
