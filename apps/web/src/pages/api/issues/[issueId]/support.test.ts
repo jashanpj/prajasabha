@@ -58,6 +58,12 @@ function testEnv(overrides: Record<string, unknown> = {}) {
     PILOT_WARD_NAMES_EN: "Ward 1",
     RATE_LIMIT_KV: fakeKv(),
     ISSUE_SUPPORT_RATE_LIMIT_PER_MEMBER_PER_HOUR: "1000",
+    // B4 (issue #27) — handleSupport's promotion CAS reads these via
+    // loadConfig(). CONCERN_THRESHOLD_T2 must match .env's real value
+    // (100) since these tests exercise loadConfig() for real, not a stub.
+    CONCERN_THRESHOLD_T2: "100",
+    QUORUM_PERCENT: "20",
+    PANEL_TERM_MONTHS: "6",
     ...overrides,
     // biome-ignore lint/suspicious/noExplicitAny: fake Cloudflare.Env for unit tests
   } as any;
@@ -119,6 +125,34 @@ async function getIssue(issueId: string) {
   const db = getServiceRoleDb(appDatabaseUrl());
   const [row] = await db.select().from(schema.issues).where(eq(schema.issues.issueId, issueId));
   return row;
+}
+
+// B4 (issue #27) — direct DB helpers to put an issue into a specific
+// pre-threshold/pre-promoted state without needing 99+ real support rows.
+async function setSupportCount(issueId: string, count: number): Promise<void> {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  await db
+    .update(schema.issues)
+    .set({ supportT2Count: count })
+    .where(eq(schema.issues.issueId, issueId));
+}
+
+async function setPromotedAt(issueId: string, at: Date): Promise<void> {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  await db.update(schema.issues).set({ promotedAt: at }).where(eq(schema.issues.issueId, issueId));
+}
+
+async function getPromotionEventLogRows(issueId: string) {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  return db
+    .select()
+    .from(schema.eventLog)
+    .where(
+      and(
+        eq(schema.eventLog.subjectId, issueId),
+        eq(schema.eventLog.kind, "issue_promoted_to_concern"),
+      ),
+    );
 }
 
 async function getIssueSupportRow(issueId: string, memberId: string) {
@@ -317,6 +351,100 @@ describe("handleSupport (POST /api/issues/:issueId/support)", () => {
 
       const after = await getIssue(issueId);
       expect(after?.supportT2Count).toBe(1);
+    } finally {
+      if (issueId) await deleteIssueSupport(issueId);
+      if (issueId) await deleteIssue(issueId);
+      await deleteMember(owner);
+      await deleteMember(supporter);
+    }
+  });
+
+  // B4 — Constituency Concern threshold & promotion (issue #27). The three
+  // tests below drive an issue right up to (and past) CONCERN_THRESHOLD_T2
+  // (100, per .env / testEnv() above) via a direct DB write to
+  // supportT2Count rather than 99+ real support rows, then exercise the
+  // real handleSupport call that crosses (or doesn't cross) the threshold.
+
+  it("fires exactly one issue_promoted_to_concern event when a support call crosses the threshold", async () => {
+    const owner = await insertMember("t1");
+    const supporter = await insertMember("t2");
+    let issueId: string | undefined;
+    try {
+      issueId = await insertIssue(owner, { status: "published" });
+      await setSupportCount(issueId, 99);
+
+      const cookie = await sessionCookie(supporter);
+      const res = await callSupport(testEnv(), issueId, { wardId: ALLOWED_WARD_ID }, cookie);
+      expect(res.status).toBe(201);
+
+      const after = await getIssue(issueId);
+      expect(after?.supportT2Count).toBe(100);
+      expect(after?.promotedAt).not.toBeNull();
+
+      const rows = await getPromotionEventLogRows(issueId);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.subjectType).toBe("issue");
+      expect(rows[0]?.subjectId).toBe(issueId);
+      expect(rows[0]?.payload).toEqual({ supportT2Count: 100 });
+    } finally {
+      if (issueId) await deleteIssueSupport(issueId);
+      if (issueId) await deleteIssue(issueId);
+      await deleteMember(owner);
+      await deleteMember(supporter);
+    }
+  });
+
+  it("does not re-fire the promotion event when an already-promoted issue's count is crossed again", async () => {
+    const owner = await insertMember("t1");
+    const supporter = await insertMember("t2");
+    let issueId: string | undefined;
+    try {
+      issueId = await insertIssue(owner, { status: "published" });
+      await setSupportCount(issueId, 150);
+      const alreadyPromotedAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      await setPromotedAt(issueId, alreadyPromotedAt);
+
+      const cookie = await sessionCookie(supporter);
+      const res = await callSupport(testEnv(), issueId, { wardId: ALLOWED_WARD_ID }, cookie);
+      expect(res.status).toBe(201);
+
+      const after = await getIssue(issueId);
+      expect(after?.supportT2Count).toBe(151);
+      expect(after?.promotedAt).not.toBeNull();
+      expect(after?.promotedAt?.getTime()).toBe(alreadyPromotedAt.getTime());
+
+      // The CAS update's WHERE promoted_at IS NULL clause must prevent a
+      // second promotion event from ever firing for this issue.
+      const rows = await getPromotionEventLogRows(issueId);
+      expect(rows).toHaveLength(0);
+    } finally {
+      if (issueId) await deleteIssueSupport(issueId);
+      if (issueId) await deleteIssue(issueId);
+      await deleteMember(owner);
+      await deleteMember(supporter);
+    }
+  });
+
+  it("does not promote an issue whose supportT2Count is still below the threshold", async () => {
+    const owner = await insertMember("t1");
+    const supporter = await insertMember("t2");
+    let issueId: string | undefined;
+    try {
+      issueId = await insertIssue(owner, { status: "published" });
+
+      const before = await getIssue(issueId);
+      expect(before?.supportT2Count).toBe(0);
+
+      const cookie = await sessionCookie(supporter);
+      const res = await callSupport(testEnv(), issueId, { wardId: ALLOWED_WARD_ID }, cookie);
+      expect(res.status).toBe(201);
+
+      const after = await getIssue(issueId);
+      expect(after?.supportT2Count).toBe(1);
+      expect(after?.promotedAt).toBeNull();
+
+      const rows = await getPromotionEventLogRows(issueId);
+      expect(rows).toHaveLength(0);
     } finally {
       if (issueId) await deleteIssueSupport(issueId);
       if (issueId) await deleteIssue(issueId);

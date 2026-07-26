@@ -1,8 +1,9 @@
 import type { APIRoute } from "astro";
 import { schema } from "db";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import {
   checkAndIncrement,
+  loadConfig,
   loadIssueSupportRateLimitConfig,
   loadPilotWardsConfig,
   verifySession,
@@ -20,6 +21,12 @@ import { getServiceRoleDb } from "../../../../lib/db";
 // insert's Postgres 23505 unique-violation is caught and translated to a
 // 409 {error: "already_supported"} instead of a 500, and only a
 // successful insert increments issues.supportT2Count.
+//
+// B4 — Constituency Concern threshold & promotion (issue #27): after the
+// increment, an atomic compare-and-swap UPDATE checks whether
+// supportT2Count has just crossed loadConfig().concernThresholdT2 and
+// promotedAt is still unset; only then does a single
+// issue_promoted_to_concern event_log row fire (see below).
 
 const POSTGRES_UNIQUE_VIOLATION = "23505";
 
@@ -113,6 +120,41 @@ export async function handleSupport(
     .update(schema.issues)
     .set({ supportT2Count: sql`${schema.issues.supportT2Count} + 1` })
     .where(eq(schema.issues.issueId, issueId));
+
+  // B4 — Constituency Concern threshold & promotion (issue #27). The CAS
+  // UPDATE only matches (and only then does the promotion event fire) if
+  // promoted_at is still NULL AND the just-incremented count has crossed
+  // the configured threshold. Postgres serializes concurrent UPDATEs on
+  // the same row, so two supports crossing the threshold at once can
+  // never both match — the promotion event fires exactly once, never
+  // repeated on re-crossing. Wrapped in a transaction with the event_log
+  // insert so a failure between the two can never leave promoted_at set
+  // with no corresponding event (a silently dropped promotion) — both
+  // commit together or neither does, matching #26's merge.ts transaction
+  // precedent.
+  const { concernThresholdT2 } = loadConfig(env as unknown as Record<string, string | undefined>);
+  await db.transaction(async (tx) => {
+    const [promoted] = await tx
+      .update(schema.issues)
+      .set({ promotedAt: sql`now()` })
+      .where(
+        and(
+          eq(schema.issues.issueId, issueId),
+          isNull(schema.issues.promotedAt),
+          gte(schema.issues.supportT2Count, concernThresholdT2),
+        ),
+      )
+      .returning({ supportT2Count: schema.issues.supportT2Count });
+
+    if (promoted) {
+      await tx.insert(schema.eventLog).values({
+        kind: "issue_promoted_to_concern",
+        subjectType: "issue",
+        subjectId: issueId,
+        payload: { supportT2Count: promoted.supportT2Count },
+      });
+    }
+  });
 
   return Response.json({ ok: true }, { status: 201 });
 }
