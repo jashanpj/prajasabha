@@ -1,7 +1,6 @@
 ---
 import Button from "../../components/Button.astro";
-import Logo from "../../components/Logo.astro";
-import TricolourHairline from "../../components/TricolourHairline.astro";
+import SiteChrome from "../../components/SiteChrome.astro";
 import "../../styles/global.css";
 import { verifySession } from "shared";
 import en from "../../i18n/en.json";
@@ -41,13 +40,10 @@ const memberId = session.memberId;
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   </head>
   <body>
-    <header>
-      <Logo size={40} />
+    <SiteChrome locale={locale}>
       <h1>{t["epic.title"]}</h1>
-    </header>
-    <TricolourHairline />
 
-    <form id="epic-form">
+      <form id="epic-form">
       <label>
         {t["epic.epicNumber.label"]}
         <input type="text" name="epicNumber" required />
@@ -141,5 +137,6 @@ const memberId = session.memberId;
         }
       });
     </script>
+    </SiteChrome>
   </body>
 </html>

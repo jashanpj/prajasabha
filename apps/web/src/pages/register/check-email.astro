@@ -1,6 +1,5 @@
 ---
-import Logo from "../../components/Logo.astro";
-import TricolourHairline from "../../components/TricolourHairline.astro";
+import SiteChrome from "../../components/SiteChrome.astro";
 import "../../styles/global.css";
 import en from "../../i18n/en.json";
 import ml from "../../i18n/ml.json";
@@ -17,11 +16,9 @@ const checkEmailBody = t["register.checkEmail.body"].replace("{ttl}", ttl);
     <title>{t["register.checkEmail.title"]}</title>
   </head>
   <body>
-    <header>
-      <Logo size={40} />
+    <SiteChrome locale={locale}>
       <h1>{t["register.checkEmail.title"]}</h1>
-    </header>
-    <TricolourHairline />
-    <p>{checkEmailBody}</p>
+      <p>{checkEmailBody}</p>
+    </SiteChrome>
   </body>
 </html>

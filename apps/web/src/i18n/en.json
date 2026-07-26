@@ -1,4 +1,8 @@
 {
+  "nav.home": "Home",
+  "nav.dashboard": "Dashboard",
+  "nav.cta.verify": "Verify to participate",
+  "footer.disclaimer": "Praja is an independent civic platform. It is not affiliated with any government body or political party.",
   "home.tagline": "Raise local issues and get them routed to the right authority.",
   "home.cta.register": "Get started",
   "home.cta.register.body": "Register with your email to raise and support local issues.",

@@ -1,7 +1,6 @@
 ---
 import Button from "../../components/Button.astro";
-import Logo from "../../components/Logo.astro";
-import TricolourHairline from "../../components/TricolourHairline.astro";
+import SiteChrome from "../../components/SiteChrome.astro";
 import "../../styles/global.css";
 import en from "../../i18n/en.json";
 import ml from "../../i18n/ml.json";
@@ -56,11 +55,8 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
     <title>{t["issue.new.title"]}</title>
   </head>
   <body>
-    <header>
-      <Logo size={40} />
+    <SiteChrome locale={locale}>
       <h1>{t["issue.new.title"]}</h1>
-    </header>
-    <TricolourHairline />
 
     <!-- Step 1: ward → create draft -->
     <form id="start-form">
@@ -324,5 +320,6 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
         font-weight: 600;
       }
     </style>
+    </SiteChrome>
   </body>
 </html>

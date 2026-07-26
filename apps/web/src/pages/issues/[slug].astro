@@ -1,8 +1,7 @@
 ---
 import { getEntry } from "astro:content";
 import AuthorityChip from "../../components/AuthorityChip.astro";
-import Logo from "../../components/Logo.astro";
-import TricolourHairline from "../../components/TricolourHairline.astro";
+import SiteChrome from "../../components/SiteChrome.astro";
 import "../../styles/global.css";
 import { schema } from "db";
 import { and, eq } from "drizzle-orm";
@@ -201,11 +200,8 @@ function timelineTimestamp(at: Date): string {
     <title>{title}</title>
   </head>
   <body>
-    <header>
-      <Logo size={40} />
+    <SiteChrome locale={locale}>
       <h1>{title}</h1>
-    </header>
-    <TricolourHairline />
 
     <p class="ps-issue-category">{categoryLabel}</p>
     <p class="ps-issue-body">{issue.body}</p>
@@ -464,5 +460,6 @@ function timelineTimestamp(at: Date): string {
         font-size: var(--font-size-caption);
       }
     </style>
+    </SiteChrome>
   </body>
 </html>

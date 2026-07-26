@@ -1,7 +1,6 @@
 ---
 import Button from "../components/Button.astro";
-import Logo from "../components/Logo.astro";
-import TricolourHairline from "../components/TricolourHairline.astro";
+import SiteChrome from "../components/SiteChrome.astro";
 import "../styles/global.css";
 import en from "../i18n/en.json";
 import ml from "../i18n/ml.json";
@@ -35,13 +34,10 @@ const magicLinkTtlMinutes = import.meta.env.DEV
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   </head>
   <body>
-    <header>
-      <Logo size={40} />
+    <SiteChrome locale={locale}>
       <h1>{t["register.title"]}</h1>
-    </header>
-    <TricolourHairline />
 
-    <form id="register-form">
+      <form id="register-form">
       <label>
         {t["register.email.label"]}
         <input type="email" name="email" required />
@@ -102,5 +98,6 @@ const magicLinkTtlMinutes = import.meta.env.DEV
         }
       });
     </script>
+    </SiteChrome>
   </body>
 </html>

@@ -1,0 +1,187 @@
+---
+// Shared site chrome (issue #88): the persistent navy navbar + standing
+// footer disclaimer every mockup screen has (web/home.dc.html,
+// web/dashboard.dc.html, web/issue.dc.html, ...) but no page in this repo
+// has ever rendered. Wraps a page's body content via <slot />; each page
+// keeps its own <html>/<head>/<title> (locale, meta tags differ per page),
+// this component only owns everything visually below that.
+//
+// Session/tier lookup mirrors index.astro's DEV-fallback pattern verbatim
+// (astro dev doesn't resolve cloudflare:workers) — duplicated here rather
+// than threaded through as props, since every page independently redoes
+// its own env/session lookups already (same posture as verify/epic.astro,
+// issues/[slug].astro, etc.).
+//
+// Wordmark text is APP_NAME ("PrajaSabha"), not the design package's
+// "Praja" — the mismatch is an open product decision tracked under #71,
+// not something to resolve unilaterally from this component. The footer
+// disclaimer string below is a verbatim exception: docs/design-system.md
+// gives it as "exact required copy" including the word "Praja" itself, so
+// it's reproduced as specified there rather than substituted.
+import { schema } from "db";
+import { eq } from "drizzle-orm";
+import { APP_NAME, verifySession } from "shared";
+import en from "../i18n/en.json";
+import ml from "../i18n/ml.json";
+import { getServiceRoleDb } from "../lib/db";
+import Badge from "./Badge.astro";
+import Button from "./Button.astro";
+import Logo from "./Logo.astro";
+import TricolourHairline from "./TricolourHairline.astro";
+
+export interface Props {
+  locale: "en" | "ml";
+}
+
+const { locale } = Astro.props;
+const t: Record<string, string> = locale === "en" ? en : ml;
+
+const sessionCookieValue = Astro.cookies.get("ps_session")?.value;
+const env = import.meta.env.DEV ? undefined : (await import("cloudflare:workers")).env;
+const sessionSecret = import.meta.env.DEV
+  ? "local-dev-session-secret-do-not-use-in-prod"
+  : env?.SESSION_SECRET;
+const session =
+  sessionCookieValue && sessionSecret
+    ? await verifySession(sessionCookieValue, sessionSecret)
+    : null;
+
+let tier: "t0" | "t1" | "t2" | null = null;
+if (session) {
+  const appDatabaseUrl = import.meta.env.DEV
+    ? "postgres://app_role:app_role_dev_only@localhost:5432/prajasabha_dev"
+    : env?.APP_DATABASE_URL;
+  const db = getServiceRoleDb(appDatabaseUrl as string);
+  const [member] = await db
+    .select({ tier: schema.members.tier })
+    .from(schema.members)
+    .where(eq(schema.members.memberId, session.memberId))
+    .limit(1);
+  tier = member?.tier ?? null;
+}
+
+const pilotConstituencyName =
+  locale === "en"
+    ? import.meta.env.DEV
+      ? "Pilot Constituency"
+      : env?.PILOT_CONSTITUENCY_NAME_EN
+    : import.meta.env.DEV
+      ? "പൈലറ്റ് മണ്ഡലം"
+      : env?.PILOT_CONSTITUENCY_NAME_ML;
+
+const currentPath = Astro.url.pathname;
+function withLang(path: string): string {
+  return `${path}?lang=${locale}`;
+}
+const otherLocaleHref = `${currentPath}?lang=${locale === "en" ? "ml" : "en"}`;
+---
+
+<nav class="ps-nav">
+  <a href={withLang("/")} class="ps-nav__brand">
+    <Logo size={32} />
+    <span>{APP_NAME}</span>
+  </a>
+  <div class="ps-nav__links">
+    <a href={withLang("/")} aria-current={currentPath === "/" ? "page" : undefined}
+      >{t["nav.home"]}</a
+    >
+    <a
+      href={withLang("/dashboard")}
+      aria-current={currentPath === "/dashboard" ? "page" : undefined}>{t["nav.dashboard"]}</a
+    >
+  </div>
+  <div class="ps-nav__right">
+    <a href={otherLocaleHref} class="ps-nav__lang">{locale === "en" ? "മലയാളം" : "EN"}</a>
+    {
+      tier === "t2" ? (
+        <Badge
+          tier="t2"
+          ward={pilotConstituencyName}
+          label={t["epic.status.badge.verifiedConstituent"].replace(
+            "{ward}",
+            pilotConstituencyName ?? "",
+          )}
+        />
+      ) : (
+        <Button
+          variant="secondary"
+          href={withLang(!session ? "/register" : "/verify/epic")}
+          class="ps-nav__cta"
+        >
+          {t["nav.cta.verify"]}
+        </Button>
+      )
+    }
+  </div>
+</nav>
+<TricolourHairline />
+
+<slot />
+
+<footer class="ps-footer">
+  <p>{t["footer.disclaimer"]}</p>
+</footer>
+
+<style>
+  .ps-nav {
+    display: flex;
+    align-items: center;
+    gap: 1.5em;
+    padding: 0.75em 1.5em;
+    background: var(--color-navy);
+    color: var(--color-ivory);
+  }
+  .ps-nav__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    color: var(--color-ivory);
+    text-decoration: none;
+    font-family: var(--font-family-heading);
+    font-weight: var(--font-weight-heading);
+    font-size: var(--font-size-heading);
+  }
+  .ps-nav__links {
+    display: flex;
+    gap: 1.25em;
+    flex: 1;
+  }
+  .ps-nav__links a {
+    color: var(--color-ivory);
+    text-decoration: none;
+    font-size: var(--font-size-body);
+  }
+  .ps-nav__links a[aria-current="page"] {
+    border-bottom: 2px solid var(--color-saffron);
+    padding-bottom: 0.2em;
+  }
+  .ps-nav__right {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+  }
+  .ps-nav__lang {
+    color: var(--color-ivory);
+    text-decoration: none;
+    font-size: var(--font-size-caption);
+  }
+  /* :global() since Button's own root element carries Button.astro's
+     scope hash, not this component's — an unscoped selector is the only
+     way to reach into a child component's rendered markup in Astro. */
+  :global(.ps-nav__cta.ps-button--secondary) {
+    background: var(--color-ivory);
+    border-color: var(--color-ivory);
+    color: var(--color-navy);
+  }
+  .ps-footer {
+    background: var(--color-navy);
+    color: var(--color-ivory);
+    padding: 1.5em;
+    text-align: center;
+    font-size: var(--font-size-caption);
+  }
+  .ps-footer p {
+    max-width: 42em;
+    margin: 0 auto;
+  }
+</style>
