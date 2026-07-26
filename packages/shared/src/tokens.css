@@ -55,6 +55,13 @@
   --badge-t2-text: var(--status-acted-upon-text);
   --badge-t2-fill: var(--status-acted-upon-fill);
   --badge-t2-border: var(--status-acted-upon-border);
+  /* On-navy variant (web/dashboard.dc.html:36) — the standard ivory-
+     context badge colors above read as low-contrast directly on the navy
+     navbar, so SiteChrome overrides to this translucent-green treatment
+     there specifically. */
+  --badge-t2-on-navy-text: #cbe7d6;
+  --badge-t2-on-navy-fill: rgba(30, 122, 70, 0.25);
+  --badge-t2-on-navy-border: rgba(125, 190, 152, 0.5);
 
   /* Progress/quorum bars */
   --progress-track: #ece9e1;
