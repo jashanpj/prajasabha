@@ -52,6 +52,13 @@ export const issueStatusEnum = pgEnum("issue_status", ["draft", "published", "me
 // Added in migration 0001 (issue #20's "Malayalam/English language
 // choice" AC) — Malayalam is the default locale per CLAUDE.md.
 export const localeEnum = pgEnum("locale", ["ml", "en"]);
+// Added in migration 0009 (issue #35's C3 Deliberation Lifecycle).
+export const deliberationStateEnum = pgEnum("deliberation_state", [
+  "open",
+  "extended",
+  "closed",
+  "summarized",
+]);
 
 export const members = pgTable(
   "members",
@@ -191,6 +198,43 @@ export const routingRules = pgTable("routing_rules", {
   role: routingRoleEnum("role").notNull(),
   legalBasisRef: text("legal_basis_ref"),
 });
+
+// Added in migration 0009 (issue #35 — C3 Deliberation Lifecycle). A
+// `deliberations` row is created only when an issue's supportT2Count
+// crosses the concern threshold (see the atomic CAS transaction in
+// apps/web/src/pages/api/issues/[issueId]/support.ts, which now also opens
+// the deliberation in the same transaction as the promotion event) — the
+// unique(issueId) constraint is a second guard against ever double-opening
+// one, on top of that CAS. `state` is a state machine enforced in
+// application code (packages/shared/src/deliberation-lifecycle.ts), not by
+// a DB CHECK — Postgres can't express "valid transition from the row's
+// current value" declaratively. extendedAt is unused until Module D
+// (panel workspace, issue #43) lands the only thing that can set it;
+// summaryArtifactKey is an R2 key (same "R2 is the blob store, PG is the
+// index" pattern as issues.photoKeys), set once by the cron sweep
+// (apps/jobs) on the closed->summarized transition.
+export const deliberations = pgTable(
+  "deliberations",
+  {
+    deliberationId: uuid("deliberation_id").primaryKey().defaultRandom(),
+    issueId: uuid("issue_id")
+      .notNull()
+      .references(() => issues.issueId),
+    state: deliberationStateEnum("state").notNull().default("open"),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+    closesAt: timestamp("closes_at", { withTimezone: true }).notNull(),
+    extendedAt: timestamp("extended_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    summarizedAt: timestamp("summarized_at", { withTimezone: true }),
+    summaryArtifactKey: text("summary_artifact_key"),
+  },
+  (t) => [
+    unique("deliberations_issue_id_uniq").on(t.issueId),
+    // The cron sweep (apps/jobs) queries `state IN (...) AND closes_at <= now()`
+    // on every run.
+    index("deliberations_state_closes_at_idx").on(t.state, t.closesAt),
+  ],
+);
 
 // Append-only (CLAUDE.md invariant 3): UPDATE/DELETE revoked from every
 // role, including service_role, in the migration. Corrections are new rows,

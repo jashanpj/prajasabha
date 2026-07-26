@@ -163,5 +163,13 @@
   "issue.timeline.kind.issue_published": "പ്രസിദ്ധീകരിച്ചു",
   "issue.timeline.kind.issue_promoted_to_concern": "കോൺസ്റ്റിറ്റ്യുവൻസി കൺസേണിലേക്ക് ഉയർത്തി",
   "issue.timeline.kind.issue_merged": "മറ്റൊരു പ്രശ്നത്തിലേക്ക് ലയിപ്പിച്ചു",
-  "issue.timeline.kind.issue_routing_flagged": "റൂട്ടിംഗ് അവലോകനത്തിനായി ഫ്ലാഗ് ചെയ്തു"
+  "issue.timeline.kind.issue_routing_flagged": "റൂട്ടിംഗ് അവലോകനത്തിനായി ഫ്ലാഗ് ചെയ്തു",
+  "issue.timeline.kind.deliberation_opened": "ചർച്ച ആരംഭിച്ചു",
+  "issue.timeline.kind.deliberation_closed": "ചർച്ച അവസാനിച്ചു",
+  "issue.timeline.kind.deliberation_summarized": "സമവായ റിപ്പോർട്ട് പ്രസിദ്ധീകരിച്ചു",
+  "issue.detail.deliberation.title": "ചർച്ച",
+  "issue.detail.deliberation.state.open": "തുറന്നിരിക്കുന്നു — {closesAt}-ന് അവസാനിക്കും",
+  "issue.detail.deliberation.state.extended": "നീട്ടി — {closesAt}-ന് അവസാനിക്കും",
+  "issue.detail.deliberation.state.closed": "അവസാനിച്ചു — സമവായ റിപ്പോർട്ട് കാത്തിരിക്കുന്നു",
+  "issue.detail.deliberation.state.summarized": "സമവായ റിപ്പോർട്ട് ലഭ്യമാണ്"
 }

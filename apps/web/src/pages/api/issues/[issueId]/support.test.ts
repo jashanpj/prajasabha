@@ -37,6 +37,17 @@ function appDatabaseUrl(): string {
   return url;
 }
 
+// One shared pool for every helper in this file, not one per call. This
+// file's test count grew enough (issue #35's new deliberation assertions)
+// to reliably hit "remaining connection slots are reserved for roles with
+// the SUPERUSER attribute" locally when each helper opened its own
+// never-closed pg Pool (getServiceRoleDb's own doc comment: connections
+// are pooled per call, nothing here ever calls .end()) — ~90 simultaneous
+// pools within one file's ~1s run comfortably exceeds a dev Postgres's
+// default 100 max_connections. Reusing one client keeps this file's own
+// connection footprint at 1 regardless of test count.
+const db = getServiceRoleDb(appDatabaseUrl());
+
 function fakeKv() {
   const store = new Map<string, string>();
   return {
@@ -64,6 +75,9 @@ function testEnv(overrides: Record<string, unknown> = {}) {
     CONCERN_THRESHOLD_T2: "100",
     QUORUM_PERCENT: "20",
     PANEL_TERM_MONTHS: "6",
+    // C3 (issue #35) — the same loadConfig() call now also reads this to
+    // open the deliberation in the same promotion transaction.
+    DELIBERATION_OPEN_DAYS: "14",
     ...overrides,
     // biome-ignore lint/suspicious/noExplicitAny: fake Cloudflare.Env for unit tests
   } as any;
@@ -75,7 +89,6 @@ async function sessionCookie(memberId: string, secret = "session-secret"): Promi
 }
 
 async function insertMember(tier: "t0" | "t1" | "t2" = "t2"): Promise<string> {
-  const db = getServiceRoleDb(appDatabaseUrl());
   const [inserted] = await db
     .insert(schema.members)
     .values({ pseudonym: `issue-support-${randomUUID().slice(0, 8)}`, tier, locale: "ml" })
@@ -85,7 +98,6 @@ async function insertMember(tier: "t0" | "t1" | "t2" = "t2"): Promise<string> {
 }
 
 async function deleteMember(memberId: string): Promise<void> {
-  const db = getServiceRoleDb(appDatabaseUrl());
   await db.delete(schema.members).where(eq(schema.members.memberId, memberId));
 }
 
@@ -93,7 +105,6 @@ async function insertIssue(
   createdBy: string,
   overrides: Partial<{ status: "draft" | "published" | "merged" | "closed" }> = {},
 ): Promise<string> {
-  const db = getServiceRoleDb(appDatabaseUrl());
   const [inserted] = await db
     .insert(schema.issues)
     .values({
@@ -112,17 +123,14 @@ async function insertIssue(
 }
 
 async function deleteIssueSupport(issueId: string): Promise<void> {
-  const db = getServiceRoleDb(appDatabaseUrl());
   await db.delete(schema.issueSupport).where(eq(schema.issueSupport.issueId, issueId));
 }
 
 async function deleteIssue(issueId: string): Promise<void> {
-  const db = getServiceRoleDb(appDatabaseUrl());
   await db.delete(schema.issues).where(eq(schema.issues.issueId, issueId));
 }
 
 async function getIssue(issueId: string) {
-  const db = getServiceRoleDb(appDatabaseUrl());
   const [row] = await db.select().from(schema.issues).where(eq(schema.issues.issueId, issueId));
   return row;
 }
@@ -130,7 +138,6 @@ async function getIssue(issueId: string) {
 // B4 (issue #27) — direct DB helpers to put an issue into a specific
 // pre-threshold/pre-promoted state without needing 99+ real support rows.
 async function setSupportCount(issueId: string, count: number): Promise<void> {
-  const db = getServiceRoleDb(appDatabaseUrl());
   await db
     .update(schema.issues)
     .set({ supportT2Count: count })
@@ -138,12 +145,10 @@ async function setSupportCount(issueId: string, count: number): Promise<void> {
 }
 
 async function setPromotedAt(issueId: string, at: Date): Promise<void> {
-  const db = getServiceRoleDb(appDatabaseUrl());
   await db.update(schema.issues).set({ promotedAt: at }).where(eq(schema.issues.issueId, issueId));
 }
 
 async function getPromotionEventLogRows(issueId: string) {
-  const db = getServiceRoleDb(appDatabaseUrl());
   return db
     .select()
     .from(schema.eventLog)
@@ -155,8 +160,30 @@ async function getPromotionEventLogRows(issueId: string) {
     );
 }
 
+// C3 (issue #35) — deliberation-open helpers, same pattern as the
+// promotion-event helpers above.
+async function getDeliberation(issueId: string) {
+  const [row] = await db
+    .select()
+    .from(schema.deliberations)
+    .where(eq(schema.deliberations.issueId, issueId));
+  return row;
+}
+
+async function deleteDeliberation(issueId: string): Promise<void> {
+  await db.delete(schema.deliberations).where(eq(schema.deliberations.issueId, issueId));
+}
+
+async function getDeliberationOpenedEventLogRows(issueId: string) {
+  return db
+    .select()
+    .from(schema.eventLog)
+    .where(
+      and(eq(schema.eventLog.subjectId, issueId), eq(schema.eventLog.kind, "deliberation_opened")),
+    );
+}
+
 async function getIssueSupportRow(issueId: string, memberId: string) {
-  const db = getServiceRoleDb(appDatabaseUrl());
   const [row] = await db
     .select()
     .from(schema.issueSupport)
@@ -387,6 +414,46 @@ describe("handleSupport (POST /api/issues/:issueId/support)", () => {
       expect(rows[0]?.subjectId).toBe(issueId);
       expect(rows[0]?.payload).toEqual({ supportT2Count: 100 });
     } finally {
+      if (issueId) await deleteDeliberation(issueId);
+      if (issueId) await deleteIssueSupport(issueId);
+      if (issueId) await deleteIssue(issueId);
+      await deleteMember(owner);
+      await deleteMember(supporter);
+    }
+  });
+
+  // C3 (issue #35) — the same promotion CAS also opens the deliberation,
+  // in the same transaction.
+  it("opens a deliberation (state='open') when a support call crosses the threshold", async () => {
+    const owner = await insertMember("t1");
+    const supporter = await insertMember("t2");
+    let issueId: string | undefined;
+    try {
+      issueId = await insertIssue(owner, { status: "published" });
+      await setSupportCount(issueId, 99);
+
+      const before = Date.now();
+      const cookie = await sessionCookie(supporter);
+      const res = await callSupport(testEnv(), issueId, { wardId: ALLOWED_WARD_ID }, cookie);
+      expect(res.status).toBe(201);
+
+      const deliberation = await getDeliberation(issueId);
+      expect(deliberation?.issueId).toBe(issueId);
+      expect(deliberation?.state).toBe("open");
+      expect(deliberation?.closedAt).toBeNull();
+      expect(deliberation?.summarizedAt).toBeNull();
+      // closesAt should be ~14 days out (DELIBERATION_OPEN_DAYS=14 in
+      // testEnv()) — allow generous slack for test-run latency.
+      const expectedClosesAt = before + 14 * 24 * 60 * 60 * 1000;
+      expect(deliberation?.closesAt.getTime()).toBeGreaterThan(expectedClosesAt - 60_000);
+      expect(deliberation?.closesAt.getTime()).toBeLessThan(expectedClosesAt + 60_000);
+
+      const openedRows = await getDeliberationOpenedEventLogRows(issueId);
+      expect(openedRows).toHaveLength(1);
+      expect(openedRows[0]?.subjectType).toBe("issue");
+      expect(openedRows[0]?.subjectId).toBe(issueId);
+    } finally {
+      if (issueId) await deleteDeliberation(issueId);
       if (issueId) await deleteIssueSupport(issueId);
       if (issueId) await deleteIssue(issueId);
       await deleteMember(owner);
@@ -417,6 +484,11 @@ describe("handleSupport (POST /api/issues/:issueId/support)", () => {
       // second promotion event from ever firing for this issue.
       const rows = await getPromotionEventLogRows(issueId);
       expect(rows).toHaveLength(0);
+
+      // ...and therefore no deliberation is opened either, since an
+      // already-promoted issue never re-enters the `if (promoted)` branch.
+      const deliberation = await getDeliberation(issueId);
+      expect(deliberation).toBeUndefined();
     } finally {
       if (issueId) await deleteIssueSupport(issueId);
       if (issueId) await deleteIssue(issueId);
@@ -445,6 +517,9 @@ describe("handleSupport (POST /api/issues/:issueId/support)", () => {
 
       const rows = await getPromotionEventLogRows(issueId);
       expect(rows).toHaveLength(0);
+
+      const deliberation = await getDeliberation(issueId);
+      expect(deliberation).toBeUndefined();
     } finally {
       if (issueId) await deleteIssueSupport(issueId);
       if (issueId) await deleteIssue(issueId);

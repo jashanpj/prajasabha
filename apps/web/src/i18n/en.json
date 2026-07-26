@@ -163,5 +163,13 @@
   "issue.timeline.kind.issue_published": "Published",
   "issue.timeline.kind.issue_promoted_to_concern": "Promoted to Constituency Concern",
   "issue.timeline.kind.issue_merged": "Merged into another issue",
-  "issue.timeline.kind.issue_routing_flagged": "Routing flagged for review"
+  "issue.timeline.kind.issue_routing_flagged": "Routing flagged for review",
+  "issue.timeline.kind.deliberation_opened": "Deliberation opened",
+  "issue.timeline.kind.deliberation_closed": "Deliberation closed",
+  "issue.timeline.kind.deliberation_summarized": "Consensus report published",
+  "issue.detail.deliberation.title": "Deliberation",
+  "issue.detail.deliberation.state.open": "Open — closes {closesAt}",
+  "issue.detail.deliberation.state.extended": "Extended — closes {closesAt}",
+  "issue.detail.deliberation.state.closed": "Closed — awaiting consensus report",
+  "issue.detail.deliberation.state.summarized": "Consensus report available"
 }

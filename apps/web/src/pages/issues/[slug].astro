@@ -132,6 +132,25 @@ function wardName(wardId: string): string {
   return locale === "en" ? ward.nameEn : ward.nameMl;
 }
 
+// C3 — Deliberation Lifecycle (issue #35). A `deliberations` row only ever
+// exists once this issue has crossed the concern threshold and been
+// promoted (support.ts's CAS transaction opens it atomically with
+// promotion) — so, like the support sidebar below, this is gated on
+// `published` and simply absent otherwise, not stubbed/faked.
+let deliberation: { state: string; closesAt: Date } | null = null;
+if (issue.status === "published") {
+  const [row] = await db
+    .select({ state: schema.deliberations.state, closesAt: schema.deliberations.closesAt })
+    .from(schema.deliberations)
+    .where(eq(schema.deliberations.issueId, issue.issueId))
+    .limit(1);
+  deliberation = row ?? null;
+}
+function deliberationStateLabel(state: string, closesAt: Date): string {
+  const template = t[`issue.detail.deliberation.state.${state}`] ?? state;
+  return template.replace("{closesAt}", timelineTimestamp(closesAt));
+}
+
 let supporterRows: { pseudonym: string; wardId: string }[] = [];
 let memberTier: "t0" | "t1" | "t2" | null = null;
 if (issue.status === "published") {
@@ -216,6 +235,13 @@ function timelineTimestamp(at: Date): string {
               </p>
             )}
           </div>
+
+          {deliberation && (
+            <div class="ps-card">
+              <h2>{t["issue.detail.deliberation.title"]}</h2>
+              <p>{deliberationStateLabel(deliberation.state, deliberation.closesAt)}</p>
+            </div>
+          )}
 
           {issue.status === "published" && (
             <div class="ps-card">

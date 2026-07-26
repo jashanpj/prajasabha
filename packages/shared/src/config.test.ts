@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   loadConfig,
+  loadConsensusConfig,
+  loadDeliberationSweepAdminConfig,
   loadEpicLinkRateLimitConfig,
   loadEpicSubmitRateLimitConfig,
   loadEpicVerificationConfig,
@@ -22,6 +24,7 @@ const VALID_CORE_ENV = {
   CONCERN_THRESHOLD_T2: "100",
   QUORUM_PERCENT: "20",
   PANEL_TERM_MONTHS: "6",
+  DELIBERATION_OPEN_DAYS: "14",
 };
 
 const VALID_MAGIC_LINK_ENV = { MAGIC_LINK_TTL_MINUTES: "15" };
@@ -69,6 +72,7 @@ describe("loadConfig", () => {
       concernThresholdT2: 100,
       quorumPercent: 20,
       panelTermMonths: 6,
+      deliberationOpenDays: 14,
     });
   });
 
@@ -78,8 +82,27 @@ describe("loadConfig", () => {
 
   it("env values are used verbatim, not silently defaulted", () => {
     expect(
-      loadConfig({ CONCERN_THRESHOLD_T2: "150", QUORUM_PERCENT: "25", PANEL_TERM_MONTHS: "12" }),
-    ).toEqual({ concernThresholdT2: 150, quorumPercent: 25, panelTermMonths: 12 });
+      loadConfig({
+        CONCERN_THRESHOLD_T2: "150",
+        QUORUM_PERCENT: "25",
+        PANEL_TERM_MONTHS: "12",
+        DELIBERATION_OPEN_DAYS: "21",
+      }),
+    ).toEqual({
+      concernThresholdT2: 150,
+      quorumPercent: 25,
+      panelTermMonths: 12,
+      deliberationOpenDays: 21,
+    });
+  });
+
+  it("throws when only DELIBERATION_OPEN_DAYS is missing", () => {
+    const { DELIBERATION_OPEN_DAYS: _omit, ...rest } = VALID_CORE_ENV;
+    expect(() => loadConfig(rest)).toThrow(/DELIBERATION_OPEN_DAYS/);
+  });
+
+  it("rejects a non-positive deliberation open window", () => {
+    expect(() => loadConfig({ ...VALID_CORE_ENV, DELIBERATION_OPEN_DAYS: "0" })).toThrow();
   });
 
   it("throws when env is empty (no silent fallback to real thresholds — CLAUDE.md invariant 6)", () => {
@@ -545,6 +568,96 @@ describe("loadIssueMergeAdminConfig (B3 — issue #26)", () => {
       loadIssueMergeAdminConfig({
         ISSUE_MERGE_ADMIN_TOKEN: "",
         ISSUE_MERGE_ADMIN_IP_ALLOWLIST: "203.0.113.10",
+      }),
+    ).toThrow();
+  });
+});
+
+// Issue #35/#34 (C3/C2) — the "Broad agreement" threshold.
+
+describe("loadConsensusConfig (C2 — issue #34)", () => {
+  it("resolves the agreement threshold and minimum voters from env", () => {
+    expect(
+      loadConsensusConfig({
+        CONSENSUS_AGREEMENT_THRESHOLD_PERCENT: "70",
+        CONSENSUS_MIN_VOTERS: "30",
+      }),
+    ).toEqual({ agreementThresholdPercent: 70, minVoters: 30 });
+  });
+
+  it("throws when env is empty (no silent fallback — CLAUDE.md invariant 6)", () => {
+    expect(() => loadConsensusConfig({})).toThrow(/Missing required config env var/);
+  });
+
+  it("throws naming the missing threshold var", () => {
+    expect(() => loadConsensusConfig({ CONSENSUS_MIN_VOTERS: "30" })).toThrow(
+      /CONSENSUS_AGREEMENT_THRESHOLD_PERCENT/,
+    );
+  });
+
+  it("throws naming the missing min-voters var", () => {
+    expect(() => loadConsensusConfig({ CONSENSUS_AGREEMENT_THRESHOLD_PERCENT: "70" })).toThrow(
+      /CONSENSUS_MIN_VOTERS/,
+    );
+  });
+
+  it("rejects a threshold outside 0-100", () => {
+    expect(() =>
+      loadConsensusConfig({
+        CONSENSUS_AGREEMENT_THRESHOLD_PERCENT: "150",
+        CONSENSUS_MIN_VOTERS: "30",
+      }),
+    ).toThrow();
+  });
+
+  it("rejects a non-positive minimum voter count", () => {
+    expect(() =>
+      loadConsensusConfig({
+        CONSENSUS_AGREEMENT_THRESHOLD_PERCENT: "70",
+        CONSENSUS_MIN_VOTERS: "0",
+      }),
+    ).toThrow();
+  });
+});
+
+// Issue #35's demo-only manual sweep trigger — same two-factor shape as
+// loadIssueMergeAdminConfig, deliberately separate vars/loader (distinct
+// endpoint, distinct blast radius).
+
+describe("loadDeliberationSweepAdminConfig (demo tooling — issue #35)", () => {
+  it("resolves the admin token and a comma-separated IP allowlist from env", () => {
+    expect(
+      loadDeliberationSweepAdminConfig({
+        DELIBERATION_SWEEP_ADMIN_TOKEN: "sweep-admin-token",
+        DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST: "203.0.113.10,203.0.113.11",
+      }),
+    ).toEqual({
+      adminToken: "sweep-admin-token",
+      ipAllowlist: ["203.0.113.10", "203.0.113.11"],
+    });
+  });
+
+  it("throws when env is empty (no silent fallback — CLAUDE.md invariant 6)", () => {
+    expect(() => loadDeliberationSweepAdminConfig({})).toThrow(/Missing required config env var/);
+  });
+
+  it("throws naming the missing admin token var", () => {
+    expect(() =>
+      loadDeliberationSweepAdminConfig({ DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST: "203.0.113.10" }),
+    ).toThrow(/DELIBERATION_SWEEP_ADMIN_TOKEN/);
+  });
+
+  it("throws naming the missing IP allowlist var", () => {
+    expect(() =>
+      loadDeliberationSweepAdminConfig({ DELIBERATION_SWEEP_ADMIN_TOKEN: "sweep-admin-token" }),
+    ).toThrow(/DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST/);
+  });
+
+  it("rejects an empty admin token", () => {
+    expect(() =>
+      loadDeliberationSweepAdminConfig({
+        DELIBERATION_SWEEP_ADMIN_TOKEN: "",
+        DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST: "203.0.113.10",
       }),
     ).toThrow();
   });

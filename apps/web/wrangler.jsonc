@@ -14,7 +14,13 @@
   // the only way this Worker reaches the identity vault, never a direct
   // packages/vault-db import (CLAUDE.md invariant 2).
   "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "local-dev-placeholder" }],
-  "services": [{ "binding": "VAULT_SVC", "service": "prajasabha-vault-svc" }],
+  // Issue #35 — C3's demo-only manual sweep trigger
+  // (POST /api/admin/deliberations/sweep) calls apps/jobs over this
+  // binding, same cross-Worker pattern as VAULT_SVC above.
+  "services": [
+    { "binding": "VAULT_SVC", "service": "prajasabha-vault-svc" },
+    { "binding": "JOBS_SVC", "service": "prajasabha-jobs" }
+  ],
   // Issue #24 — B1 evidence photos. EXIF/GPS-stripped bytes only (the
   // photos endpoint strips before put); keys are indexed in
   // issues.photo_keys. Needs a real bucket per environment
@@ -36,5 +42,8 @@
   // ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR (issue #24),
   // FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR (issue #25),
   // ISSUE_SUPPORT_RATE_LIMIT_PER_MEMBER_PER_HOUR, ISSUE_MERGE_ADMIN_TOKEN,
-  // ISSUE_MERGE_ADMIN_IP_ALLOWLIST (issue #26) — see .env.example.
+  // ISSUE_MERGE_ADMIN_IP_ALLOWLIST (issue #26),
+  // DELIBERATION_OPEN_DAYS, DELIBERATION_SWEEP_ADMIN_TOKEN,
+  // DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST, JOBS_INTERNAL_TOKEN
+  // (issue #35) — see .env.example.
 }

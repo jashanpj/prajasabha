@@ -7,8 +7,15 @@
     "build": "wrangler deploy --dry-run --outdir dist",
     "test": "vitest run"
   },
+  "dependencies": {
+    "db": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.22.0",
+    "shared": "workspace:*"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260724.1",
+    "@types/pg": "^8.20.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.4",
     "wrangler": "^4.114.0"

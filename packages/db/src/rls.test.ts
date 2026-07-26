@@ -200,3 +200,67 @@ describe("routings RLS (join-gated on published issues)", () => {
     }
   });
 });
+
+// Issue #35 (C3 — Deliberation Lifecycle). A schema-guard review flagged an
+// earlier draft of this migration for modeling `deliberations_public_read`
+// on `authorities` (static reference data, `USING (true)`) instead of on
+// `routings` (a child of `issues`, join-gated on `status = 'published'`) —
+// this test asserts the fixed, join-gated behavior directly against real
+// RLS, the same way the `routings` describe block above does.
+describe("deliberations RLS (join-gated on published issues)", () => {
+  it("anon cannot see a deliberation for a draft issue", async () => {
+    await withRole(databaseUrl, "service_role", async (client) => {
+      await client.query(
+        `INSERT INTO deliberations (issue_id, closes_at)
+         SELECT issue_id, now() + interval '14 days' FROM issues WHERE slug = $1`,
+        [draftSlug],
+      );
+    });
+
+    try {
+      const rows = await withRole(databaseUrl, "anon", async (client) => {
+        const result = await client.query(
+          "SELECT d.* FROM deliberations d JOIN issues i ON i.issue_id = d.issue_id WHERE i.slug = $1",
+          [draftSlug],
+        );
+        return result.rows;
+      });
+      expect(rows).toHaveLength(0);
+    } finally {
+      await withRole(databaseUrl, "service_role", async (client) => {
+        await client.query(
+          "DELETE FROM deliberations WHERE issue_id IN (SELECT issue_id FROM issues WHERE slug = $1)",
+          [draftSlug],
+        );
+      });
+    }
+  });
+
+  it("anon can see a deliberation for a published issue", async () => {
+    await withRole(databaseUrl, "service_role", async (client) => {
+      await client.query(
+        `INSERT INTO deliberations (issue_id, closes_at)
+         SELECT issue_id, now() + interval '14 days' FROM issues WHERE slug = $1`,
+        [publishedSlug],
+      );
+    });
+
+    try {
+      const rows = await withRole(databaseUrl, "anon", async (client) => {
+        const result = await client.query(
+          "SELECT d.* FROM deliberations d JOIN issues i ON i.issue_id = d.issue_id WHERE i.slug = $1",
+          [publishedSlug],
+        );
+        return result.rows;
+      });
+      expect(rows).toHaveLength(1);
+    } finally {
+      await withRole(databaseUrl, "service_role", async (client) => {
+        await client.query(
+          "DELETE FROM deliberations WHERE issue_id IN (SELECT issue_id FROM issues WHERE slug = $1)",
+          [publishedSlug],
+        );
+      });
+    }
+  });
+});
