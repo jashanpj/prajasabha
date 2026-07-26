@@ -73,12 +73,13 @@ const currentPath = Astro.url.pathname;
 function withLang(path: string): string {
   return `${path}?lang=${locale}`;
 }
-const otherLocaleHref = `${currentPath}?lang=${locale === "en" ? "ml" : "en"}`;
+const enHref = `${currentPath}?lang=en`;
+const mlHref = `${currentPath}?lang=ml`;
 ---
 
 <nav class="ps-nav">
   <a href={withLang("/")} class="ps-nav__brand">
-    <Logo size={32} />
+    <Logo size={32} color="var(--color-ivory)" />
     <span>{APP_NAME}</span>
   </a>
   <div class="ps-nav__links">
@@ -92,7 +93,11 @@ const otherLocaleHref = `${currentPath}?lang=${locale === "en" ? "ml" : "en"}`;
     }
   </div>
   <div class="ps-nav__right">
-    <a href={otherLocaleHref} class="ps-nav__lang">{locale === "en" ? "മലയാളം" : "EN"}</a>
+    <div class="ps-nav__lang">
+      <a href={enHref} aria-current={locale === "en" ? "page" : undefined}>EN</a>
+      <span aria-hidden="true">·</span>
+      <a href={mlHref} aria-current={locale === "ml" ? "page" : undefined}>മലയാളം</a>
+    </div>
     {
       tier === "t2" ? (
         <Badge
@@ -162,9 +167,24 @@ const otherLocaleHref = `${currentPath}?lang=${locale === "en" ? "ml" : "en"}`;
     gap: 1em;
   }
   .ps-nav__lang {
-    color: var(--color-ivory);
-    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    border: 1px solid rgba(250, 249, 246, 0.4);
+    border-radius: var(--radius-button);
+    padding: 0.4em 0.8em;
     font-size: var(--font-size-caption);
+  }
+  .ps-nav__lang span {
+    color: rgba(250, 249, 246, 0.5);
+  }
+  .ps-nav__lang a {
+    color: rgba(250, 249, 246, 0.6);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .ps-nav__lang a[aria-current="page"] {
+    color: var(--color-ivory);
   }
   /* :global() since Button's own root element carries Button.astro's
      scope hash, not this component's — an unscoped selector is the only

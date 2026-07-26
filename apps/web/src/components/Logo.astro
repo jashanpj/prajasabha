@@ -8,10 +8,14 @@
 // docs/design-system.md.
 export interface Props {
   size?: number;
+  // Stroke/fill color — defaults to navy for use on the ivory page
+  // background; SiteChrome.astro passes ivory explicitly since it renders
+  // this on the navy navbar (navy-on-navy would be invisible).
+  color?: string;
   class?: string;
 }
 
-const { size = 40, class: className } = Astro.props;
+const { size = 40, color = "var(--color-navy)", class: className } = Astro.props;
 
 const SPOKE_COUNT = 24;
 const CENTER = 50;
@@ -39,7 +43,7 @@ const spokes = Array.from({ length: SPOKE_COUNT }, (_, i) => {
   aria-label="Praja"
   data-testid="ps-logo"
 >
-  <circle cx={CENTER} cy={CENTER} r={OUTER_RING_RADIUS} fill="none" stroke="var(--color-navy)" stroke-width="2" />
+  <circle cx={CENTER} cy={CENTER} r={OUTER_RING_RADIUS} fill="none" stroke={color} stroke-width="2" />
   {
     spokes.map((s) => (
       <line
@@ -47,12 +51,12 @@ const spokes = Array.from({ length: SPOKE_COUNT }, (_, i) => {
         y1={s.y1}
         x2={s.x2}
         y2={s.y2}
-        stroke="var(--color-navy)"
+        stroke={color}
         stroke-width="2"
         stroke-dasharray="3 3"
         stroke-linecap="round"
       />
     ))
   }
-  <circle cx={CENTER} cy={CENTER} r="6" fill="var(--color-navy)" />
+  <circle cx={CENTER} cy={CENTER} r="6" fill={color} />
 </svg>

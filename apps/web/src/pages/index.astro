@@ -93,15 +93,83 @@ const [{ verifiedConstituents }] = await db
         </div>
         <div class="ps-hero__features">
           <div class="ps-card">
-            <h2>{t["home.features.neutral.title"]}</h2>
+            <div class="ps-card__header">
+              <svg
+                class="ps-card__icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  fill="none"
+                  stroke="var(--color-navy)"
+                  stroke-width="1.5"
+                />
+                <circle cx="12" cy="12" r="2.5" fill="var(--color-navy)" />
+              </svg>
+              <h2>{t["home.features.neutral.title"]}</h2>
+            </div>
             <p>{t["home.features.neutral.body"]}</p>
           </div>
           <div class="ps-card">
-            <h2>{t["home.features.oneVoice.title"]}</h2>
+            <div class="ps-card__header">
+              <svg
+                class="ps-card__icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  fill="none"
+                  stroke="var(--color-green)"
+                  stroke-width="1.5"
+                />
+                <path
+                  d="M8 12.5l2.5 2.5 5-5.5"
+                  fill="none"
+                  stroke="var(--color-green)"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+              <h2>{t["home.features.oneVoice.title"]}</h2>
+            </div>
             <p>{t["home.features.oneVoice.body"]}</p>
           </div>
           <div class="ps-card">
-            <h2>{t["home.features.record.title"]}</h2>
+            <div class="ps-card__header">
+              <svg
+                class="ps-card__icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+              >
+                <rect
+                  x="5"
+                  y="3"
+                  width="14"
+                  height="18"
+                  rx="1.5"
+                  fill="none"
+                  stroke="var(--color-saffron)"
+                  stroke-width="1.5"
+                />
+                <line x1="8" y1="8" x2="16" y2="8" stroke="var(--color-saffron)" stroke-width="1.5" />
+                <line x1="8" y1="12" x2="16" y2="12" stroke="var(--color-saffron)" stroke-width="1.5" />
+                <line x1="8" y1="16" x2="13" y2="16" stroke="var(--color-saffron)" stroke-width="1.5" />
+              </svg>
+              <h2>{t["home.features.record.title"]}</h2>
+            </div>
             <p>{t["home.features.record.body"]}</p>
           </div>
         </div>
@@ -125,8 +193,10 @@ const [{ verifiedConstituents }] = await db
             <p>{t["home.howItWorks.step2.body"]}</p>
           </li>
           <li>
-            <span class="ps-how__step-number">3</span>
-            <h3>{t["home.howItWorks.step3.title"]}</h3>
+            <div class="ps-how__step-header">
+              <span class="ps-how__step-number">3</span>
+              <h3>{t["home.howItWorks.step3.title"]}</h3>
+            </div>
             <p>{t["home.howItWorks.step3.body"]}</p>
           </li>
         </ol>
@@ -174,9 +244,18 @@ const [{ verifiedConstituents }] = await db
     border-radius: var(--radius-card);
     padding: 1em 1.25em;
   }
+  .ps-card__header {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    margin: 0 0 0.3em;
+  }
+  .ps-card__icon {
+    flex-shrink: 0;
+  }
   .ps-card h2 {
     font-size: var(--font-size-heading);
-    margin: 0 0 0.3em;
+    margin: 0;
   }
   .ps-card p {
     color: var(--color-muted);
@@ -194,7 +273,8 @@ const [{ verifiedConstituents }] = await db
     gap: 1.5em;
     padding: 0;
   }
-  .ps-how__steps a {
+  .ps-how__steps a,
+  .ps-how__step-header {
     display: flex;
     align-items: center;
     gap: 0.6em;

@@ -53,24 +53,32 @@ export const issueStatusEnum = pgEnum("issue_status", ["draft", "published", "me
 // choice" AC) — Malayalam is the default locale per CLAUDE.md.
 export const localeEnum = pgEnum("locale", ["ml", "en"]);
 
-export const members = pgTable("members", {
-  memberId: uuid("member_id").primaryKey().defaultRandom(),
-  pseudonym: citext("pseudonym").notNull().unique(),
-  tier: memberTierEnum("tier").notNull().default("t0"),
-  constituencyId: uuid("constituency_id"),
-  wardId: uuid("ward_id"),
-  locale: localeEnum("locale").notNull().default("ml"),
-  // Added in migration 0003 (issue #22's A3 EPIC/T2 verification). The
-  // pilot targets a single Lok Sabha constituency, so — unlike
-  // constituencyId/wardId above — there is no constituencies/wards lookup
-  // table to FK against; assemblySegment is the reviewer-confirmed segment
-  // name, and coverage is checked against a config-driven allow-list
-  // (packages/shared's loadEpicVerificationConfig), same pattern as
-  // concernThresholdT2. Both nullable: unset until a T2 approval happens.
-  assemblySegment: text("assembly_segment"),
-  assemblySegmentCovered: boolean("assembly_segment_covered"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const members = pgTable(
+  "members",
+  {
+    memberId: uuid("member_id").primaryKey().defaultRandom(),
+    pseudonym: citext("pseudonym").notNull().unique(),
+    tier: memberTierEnum("tier").notNull().default("t0"),
+    constituencyId: uuid("constituency_id"),
+    wardId: uuid("ward_id"),
+    locale: localeEnum("locale").notNull().default("ml"),
+    // Added in migration 0003 (issue #22's A3 EPIC/T2 verification). The
+    // pilot targets a single Lok Sabha constituency, so — unlike
+    // constituencyId/wardId above — there is no constituencies/wards lookup
+    // table to FK against; assemblySegment is the reviewer-confirmed segment
+    // name, and coverage is checked against a config-driven allow-list
+    // (packages/shared's loadEpicVerificationConfig), same pattern as
+    // concernThresholdT2. Both nullable: unset until a T2 approval happens.
+    assemblySegment: text("assembly_segment"),
+    assemblySegmentCovered: boolean("assembly_segment_covered"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  // Added in migration 0007 (issue #89's homepage "verified constituents"
+  // count) — that query is a tier='t2' count(*) run on every homepage
+  // load, including anonymous visitors; without this it was a full
+  // sequential scan on every hit (security-reviewer finding).
+  (t) => [index("members_tier_idx").on(t.tier)],
+);
 
 export const issues = pgTable(
   "issues",
