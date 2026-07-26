@@ -200,3 +200,178 @@ export function loadEpicVerificationConfig(
     coveredAssemblySegments: env.COVERED_ASSEMBLY_SEGMENTS,
   });
 }
+
+// Issue #24 — B1 "Raise an Issue" form. Both are the "config, not schema"
+// treatment: no categories/wards lookup table exists (packages/db's
+// issues.category is deliberately free text — data-driven taxonomy, HLD
+// §6 — and the pilot targets a single constituency's wards), so the
+// allow-lists live in env, same pattern as loadEpicVerificationConfig
+// above. publish.ts validates a draft's saved category/wardId against
+// these before flipping status to 'published'.
+
+const ISSUE_CATEGORIES_REQUIRED_VARS = ["ISSUE_CATEGORIES"] as const;
+
+const IssueCategoriesConfigSchema = z.object({
+  issueCategories: commaSeparatedList,
+});
+
+export type IssueCategoriesConfig = z.infer<typeof IssueCategoriesConfigSchema>;
+
+/** The configured issue-category allow-list (comma-separated codes). */
+export function loadIssueCategoriesConfig(
+  env: Record<string, string | undefined>,
+): IssueCategoriesConfig {
+  const missing = ISSUE_CATEGORIES_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return IssueCategoriesConfigSchema.parse({ issueCategories: env.ISSUE_CATEGORIES });
+}
+
+const PILOT_WARDS_REQUIRED_VARS = [
+  "PILOT_WARD_IDS",
+  "PILOT_WARD_NAMES_ML",
+  "PILOT_WARD_NAMES_EN",
+] as const;
+
+const PilotWardSchema = z.object({
+  id: z.string().uuid(),
+  nameMl: z.string().min(1),
+  nameEn: z.string().min(1),
+});
+
+export interface PilotWardsConfig {
+  pilotWards: z.infer<typeof PilotWardSchema>[];
+}
+
+/**
+ * The pilot's ward allow-list: three index-aligned comma-separated env
+ * lists (ids, Malayalam names, English names) zipped into one array. The
+ * names exist so the form's ward <select> renders bilingual labels without
+ * a wards table; the ids are what issues.ward_id stores and what
+ * publish-time validation checks.
+ */
+export function loadPilotWardsConfig(env: Record<string, string | undefined>): PilotWardsConfig {
+  const missing = PILOT_WARDS_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  const ids = commaSeparatedList.parse(env.PILOT_WARD_IDS);
+  const namesMl = commaSeparatedList.parse(env.PILOT_WARD_NAMES_ML);
+  const namesEn = commaSeparatedList.parse(env.PILOT_WARD_NAMES_EN);
+
+  if (ids.length !== namesMl.length || ids.length !== namesEn.length) {
+    throw new Error(
+      `Pilot-wards config lists are not index-aligned: PILOT_WARD_IDS has ${ids.length} entries, PILOT_WARD_NAMES_ML has ${namesMl.length}, PILOT_WARD_NAMES_EN has ${namesEn.length}.`,
+    );
+  }
+
+  const pilotWards = ids.map((id, index) =>
+    PilotWardSchema.parse({ id, nameMl: namesMl[index], nameEn: namesEn[index] }),
+  );
+
+  return { pilotWards };
+}
+
+// Issue #24's four mutation endpoints (create/draft/photos/publish) are
+// session-authed, not anonymous like registration — so no Turnstile, but
+// every other mutation endpoint in this codebase (register/start.ts,
+// verify/epic/submit.ts) still rate-limits, and photos.ts in particular
+// runs CPU-bound EXIF parsing plus an R2 write per call, so it needs a
+// throttle at least as much as those do. Per-member (not per-IP): the
+// session cookie already ties every call to one member_id, and there is
+// no enumeration risk here the way there is on register (no anon caller
+// can probe for "does this member exist").
+
+// Four separate loaders, not one bundled config — unlike loadRateLimitConfig
+// (register's ip+email limits, both consumed by the SAME start.ts), each of
+// these is read by a DIFFERENT endpoint file (create.ts/draft.ts/photos.ts/
+// publish.ts), so bundling would force e.g. draft.ts's tests to also stub
+// photos.ts's limit. Same reasoning as loadEpicSubmitRateLimitConfig vs.
+// loadEpicLinkRateLimitConfig being split by consumer.
+
+const ISSUE_CREATE_RATE_LIMIT_REQUIRED_VARS = [
+  "ISSUE_CREATE_RATE_LIMIT_PER_MEMBER_PER_HOUR",
+] as const;
+
+const IssueCreateRateLimitConfigSchema = z.object({
+  issueCreateRateLimitPerMemberPerHour: z.coerce.number().int().positive(),
+});
+
+export type IssueCreateRateLimitConfig = z.infer<typeof IssueCreateRateLimitConfigSchema>;
+
+/** apps/web's POST /api/issues/create per-member hourly limit. */
+export function loadIssueCreateRateLimitConfig(
+  env: Record<string, string | undefined>,
+): IssueCreateRateLimitConfig {
+  const missing = ISSUE_CREATE_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return IssueCreateRateLimitConfigSchema.parse({
+    issueCreateRateLimitPerMemberPerHour: env.ISSUE_CREATE_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  });
+}
+
+const ISSUE_DRAFT_RATE_LIMIT_REQUIRED_VARS = [
+  "ISSUE_DRAFT_RATE_LIMIT_PER_MEMBER_PER_HOUR",
+] as const;
+
+const IssueDraftRateLimitConfigSchema = z.object({
+  issueDraftRateLimitPerMemberPerHour: z.coerce.number().int().positive(),
+});
+
+export type IssueDraftRateLimitConfig = z.infer<typeof IssueDraftRateLimitConfigSchema>;
+
+/** apps/web's PATCH /api/issues/:issueId/draft per-member hourly limit. */
+export function loadIssueDraftRateLimitConfig(
+  env: Record<string, string | undefined>,
+): IssueDraftRateLimitConfig {
+  const missing = ISSUE_DRAFT_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return IssueDraftRateLimitConfigSchema.parse({
+    issueDraftRateLimitPerMemberPerHour: env.ISSUE_DRAFT_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  });
+}
+
+const ISSUE_PHOTO_RATE_LIMIT_REQUIRED_VARS = [
+  "ISSUE_PHOTO_RATE_LIMIT_PER_MEMBER_PER_HOUR",
+] as const;
+
+const IssuePhotoRateLimitConfigSchema = z.object({
+  issuePhotoRateLimitPerMemberPerHour: z.coerce.number().int().positive(),
+});
+
+export type IssuePhotoRateLimitConfig = z.infer<typeof IssuePhotoRateLimitConfigSchema>;
+
+/** apps/web's POST /api/issues/:issueId/photos per-member hourly limit. */
+export function loadIssuePhotoRateLimitConfig(
+  env: Record<string, string | undefined>,
+): IssuePhotoRateLimitConfig {
+  const missing = ISSUE_PHOTO_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return IssuePhotoRateLimitConfigSchema.parse({
+    issuePhotoRateLimitPerMemberPerHour: env.ISSUE_PHOTO_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  });
+}
+
+const ISSUE_PUBLISH_RATE_LIMIT_REQUIRED_VARS = [
+  "ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR",
+] as const;
+
+const IssuePublishRateLimitConfigSchema = z.object({
+  issuePublishRateLimitPerMemberPerHour: z.coerce.number().int().positive(),
+});
+
+export type IssuePublishRateLimitConfig = z.infer<typeof IssuePublishRateLimitConfigSchema>;
+
+/** apps/web's POST /api/issues/:issueId/publish per-member hourly limit. */
+export function loadIssuePublishRateLimitConfig(
+  env: Record<string, string | undefined>,
+): IssuePublishRateLimitConfig {
+  const missing = ISSUE_PUBLISH_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return IssuePublishRateLimitConfigSchema.parse({
+    issuePublishRateLimitPerMemberPerHour: env.ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  });
+}

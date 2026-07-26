@@ -4,7 +4,13 @@ import {
   loadEpicLinkRateLimitConfig,
   loadEpicSubmitRateLimitConfig,
   loadEpicVerificationConfig,
+  loadIssueCategoriesConfig,
+  loadIssueCreateRateLimitConfig,
+  loadIssueDraftRateLimitConfig,
+  loadIssuePhotoRateLimitConfig,
+  loadIssuePublishRateLimitConfig,
   loadMagicLinkConfig,
+  loadPilotWardsConfig,
   loadRateLimitConfig,
   loadReviewQueueConfig,
 } from "./config";
@@ -33,6 +39,25 @@ const VALID_EPIC_VERIFICATION_ENV = {
   PILOT_CONSTITUENCY_NAME_ML: "പൈലറ്റ് മണ്ഡലം",
   PILOT_CONSTITUENCY_NAME_EN: "Pilot Constituency",
   COVERED_ASSEMBLY_SEGMENTS: "Segment One,Segment Two",
+};
+
+// Issue #24 — B1 "Raise an Issue" form. Both are the "config, not schema"
+// treatment the approved plan confirms for issues.category/issues.wardId —
+// no wards/categories lookup table exists (see packages/db/src/schema.ts's
+// own comment on `category`), same pattern as loadEpicVerificationConfig
+// above.
+
+const VALID_ISSUE_CATEGORIES_ENV = {
+  ISSUE_CATEGORIES: "roads,water,electricity",
+};
+
+const VALID_UUID_1 = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
+const VALID_UUID_2 = "5b1b6e1e-1c1a-4e1a-9c1a-2c963f66afa6";
+
+const VALID_PILOT_WARDS_ENV = {
+  PILOT_WARD_IDS: `${VALID_UUID_1},${VALID_UUID_2}`,
+  PILOT_WARD_NAMES_ML: "വാർഡ് 1,വാർഡ് 2",
+  PILOT_WARD_NAMES_EN: "Ward 1,Ward 2",
 };
 
 describe("loadConfig", () => {
@@ -250,5 +275,161 @@ describe("loadEpicVerificationConfig", () => {
       pilotConstituencyNameEn: "Pilot Constituency",
       coveredAssemblySegments: ["Only Segment"],
     });
+  });
+});
+
+describe("loadIssueCategoriesConfig (B1 — issue #24)", () => {
+  it("resolves a comma-separated category list from env into an array", () => {
+    expect(loadIssueCategoriesConfig(VALID_ISSUE_CATEGORIES_ENV)).toEqual({
+      issueCategories: ["roads", "water", "electricity"],
+    });
+  });
+
+  it("trims whitespace around each category code", () => {
+    expect(loadIssueCategoriesConfig({ ISSUE_CATEGORIES: " roads , water " })).toEqual({
+      issueCategories: ["roads", "water"],
+    });
+  });
+
+  it("resolves a single category without a trailing comma", () => {
+    expect(loadIssueCategoriesConfig({ ISSUE_CATEGORIES: "roads" })).toEqual({
+      issueCategories: ["roads"],
+    });
+  });
+
+  it("does not require core, magic-link, or rate-limit vars", () => {
+    expect(() => loadIssueCategoriesConfig(VALID_ISSUE_CATEGORIES_ENV)).not.toThrow();
+  });
+
+  it("throws when env is empty (no silent fallback — CLAUDE.md invariant 6)", () => {
+    expect(() => loadIssueCategoriesConfig({})).toThrow(/Missing required config env var/);
+  });
+
+  it("throws naming the missing var", () => {
+    expect(() => loadIssueCategoriesConfig({})).toThrow(/ISSUE_CATEGORIES/);
+  });
+});
+
+describe("loadPilotWardsConfig (B1 — issue #24)", () => {
+  it("zips the three index-aligned comma lists into {id, nameMl, nameEn}[]", () => {
+    expect(loadPilotWardsConfig(VALID_PILOT_WARDS_ENV)).toEqual({
+      pilotWards: [
+        { id: VALID_UUID_1, nameMl: "വാർഡ് 1", nameEn: "Ward 1" },
+        { id: VALID_UUID_2, nameMl: "വാർഡ് 2", nameEn: "Ward 2" },
+      ],
+    });
+  });
+
+  it("resolves a single ward without a trailing comma", () => {
+    expect(
+      loadPilotWardsConfig({
+        PILOT_WARD_IDS: VALID_UUID_1,
+        PILOT_WARD_NAMES_ML: "വാർഡ് 1",
+        PILOT_WARD_NAMES_EN: "Ward 1",
+      }),
+    ).toEqual({ pilotWards: [{ id: VALID_UUID_1, nameMl: "വാർഡ് 1", nameEn: "Ward 1" }] });
+  });
+
+  it("does not require core, magic-link, or rate-limit vars", () => {
+    expect(() => loadPilotWardsConfig(VALID_PILOT_WARDS_ENV)).not.toThrow();
+  });
+
+  it("throws when env is empty", () => {
+    expect(() => loadPilotWardsConfig({})).toThrow(/Missing required config env var/);
+  });
+
+  it("throws when only PILOT_WARD_IDS is missing", () => {
+    const { PILOT_WARD_IDS: _omit, ...rest } = VALID_PILOT_WARDS_ENV;
+    expect(() => loadPilotWardsConfig(rest)).toThrow(/PILOT_WARD_IDS/);
+  });
+
+  it("throws when only PILOT_WARD_NAMES_ML is missing", () => {
+    const { PILOT_WARD_NAMES_ML: _omit, ...rest } = VALID_PILOT_WARDS_ENV;
+    expect(() => loadPilotWardsConfig(rest)).toThrow(/PILOT_WARD_NAMES_ML/);
+  });
+
+  it("throws when only PILOT_WARD_NAMES_EN is missing", () => {
+    const { PILOT_WARD_NAMES_EN: _omit, ...rest } = VALID_PILOT_WARDS_ENV;
+    expect(() => loadPilotWardsConfig(rest)).toThrow(/PILOT_WARD_NAMES_EN/);
+  });
+});
+
+describe("loadIssueCreateRateLimitConfig (B1 — issue #24)", () => {
+  it("resolves the per-member rate limit from env", () => {
+    expect(
+      loadIssueCreateRateLimitConfig({ ISSUE_CREATE_RATE_LIMIT_PER_MEMBER_PER_HOUR: "20" }),
+    ).toEqual({ issueCreateRateLimitPerMemberPerHour: 20 });
+  });
+
+  it("throws when env is empty", () => {
+    expect(() => loadIssueCreateRateLimitConfig({})).toThrow(
+      /ISSUE_CREATE_RATE_LIMIT_PER_MEMBER_PER_HOUR/,
+    );
+  });
+
+  it("rejects a non-positive rate limit", () => {
+    expect(() =>
+      loadIssueCreateRateLimitConfig({ ISSUE_CREATE_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
+    ).toThrow();
+  });
+});
+
+describe("loadIssueDraftRateLimitConfig (B1 — issue #24)", () => {
+  it("resolves the per-member rate limit from env", () => {
+    expect(
+      loadIssueDraftRateLimitConfig({ ISSUE_DRAFT_RATE_LIMIT_PER_MEMBER_PER_HOUR: "120" }),
+    ).toEqual({ issueDraftRateLimitPerMemberPerHour: 120 });
+  });
+
+  it("throws when env is empty", () => {
+    expect(() => loadIssueDraftRateLimitConfig({})).toThrow(
+      /ISSUE_DRAFT_RATE_LIMIT_PER_MEMBER_PER_HOUR/,
+    );
+  });
+
+  it("rejects a non-positive rate limit", () => {
+    expect(() =>
+      loadIssueDraftRateLimitConfig({ ISSUE_DRAFT_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
+    ).toThrow();
+  });
+});
+
+describe("loadIssuePhotoRateLimitConfig (B1 — issue #24)", () => {
+  it("resolves the per-member rate limit from env", () => {
+    expect(
+      loadIssuePhotoRateLimitConfig({ ISSUE_PHOTO_RATE_LIMIT_PER_MEMBER_PER_HOUR: "60" }),
+    ).toEqual({ issuePhotoRateLimitPerMemberPerHour: 60 });
+  });
+
+  it("throws when env is empty", () => {
+    expect(() => loadIssuePhotoRateLimitConfig({})).toThrow(
+      /ISSUE_PHOTO_RATE_LIMIT_PER_MEMBER_PER_HOUR/,
+    );
+  });
+
+  it("rejects a non-positive rate limit", () => {
+    expect(() =>
+      loadIssuePhotoRateLimitConfig({ ISSUE_PHOTO_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
+    ).toThrow();
+  });
+});
+
+describe("loadIssuePublishRateLimitConfig (B1 — issue #24)", () => {
+  it("resolves the per-member rate limit from env", () => {
+    expect(
+      loadIssuePublishRateLimitConfig({ ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR: "20" }),
+    ).toEqual({ issuePublishRateLimitPerMemberPerHour: 20 });
+  });
+
+  it("throws when env is empty", () => {
+    expect(() => loadIssuePublishRateLimitConfig({})).toThrow(
+      /ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR/,
+    );
+  });
+
+  it("rejects a non-positive rate limit", () => {
+    expect(() =>
+      loadIssuePublishRateLimitConfig({ ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
+    ).toThrow();
   });
 });

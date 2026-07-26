@@ -56,6 +56,25 @@ export const issueCreateSchema = z.object({
 });
 export type IssueCreate = z.infer<typeof issueCreateSchema>;
 
+// B1: debounced autosave PATCH body (issue #24). A straight .partial() of
+// issueCreateSchema: every field optional (an empty object is a valid
+// no-op autosave tick), but any field that IS present stays bound by
+// issueCreateSchema's own rules — an autosaved empty title is rejected at
+// the boundary, not silently persisted and caught only at publish time.
+export const issueDraftUpdateSchema = issueCreateSchema.partial();
+export type IssueDraftUpdate = z.infer<typeof issueDraftUpdateSchema>;
+
+// B1: evidence-photo upload body (issue #24). Content validation (magic-
+// byte mime sniffing, the 5-photo cap, EXIF stripping) happens at the
+// endpoint — this schema only enforces payload shape. `filename` is used
+// for nothing security-relevant (the stored key is a server-generated
+// uuid + sniffed extension); it exists for error messages and the form UI.
+export const issuePhotoUploadSchema = z.object({
+  photoBase64: z.string().min(1),
+  filename: z.string().min(1),
+});
+export type IssuePhotoUpload = z.infer<typeof issuePhotoUploadSchema>;
+
 // B3/B4: issue support ("concern") action — dedup enforced at the DB layer
 // via issue_support's unique(issue_id, member_id) constraint.
 export const issueSupportActionSchema = z.object({

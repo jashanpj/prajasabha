@@ -14,7 +14,13 @@
   // the only way this Worker reaches the identity vault, never a direct
   // packages/vault-db import (CLAUDE.md invariant 2).
   "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "local-dev-placeholder" }],
-  "services": [{ "binding": "VAULT_SVC", "service": "prajasabha-vault-svc" }]
+  "services": [{ "binding": "VAULT_SVC", "service": "prajasabha-vault-svc" }],
+  // Issue #24 — B1 evidence photos. EXIF/GPS-stripped bytes only (the
+  // photos endpoint strips before put); keys are indexed in
+  // issues.photo_keys. Needs a real bucket per environment
+  // (`wrangler r2 bucket create prajasabha-issue-photos`) before deploying
+  // — local `wrangler dev` emulates it.
+  "r2_buckets": [{ "binding": "ISSUE_PHOTOS", "bucket_name": "prajasabha-issue-photos" }]
   // Secrets (never committed — set via `wrangler secret put <NAME>` per
   // environment, or a gitignored .env/.dev.vars locally): APP_DATABASE_URL,
   // VAULT_SVC_INTERNAL_TOKEN, RESEND_API_KEY, TURNSTILE_SECRET_KEY,
@@ -22,6 +28,10 @@
   // REGISTER_RATE_LIMIT_PER_EMAIL_PER_HOUR, REGISTER_RATE_LIMIT_PER_IP_PER_HOUR,
   // VERIFY_RATE_LIMIT_PER_IP_PER_HOUR, PILOT_CONSTITUENCY_NAME_ML,
   // PILOT_CONSTITUENCY_NAME_EN, COVERED_ASSEMBLY_SEGMENTS,
-  // EPIC_LINK_RATE_LIMIT_PER_MEMBER_PER_HOUR, PUBLIC_VAULT_SVC_URL (issue #22)
-  // — see .env.example.
+  // EPIC_LINK_RATE_LIMIT_PER_MEMBER_PER_HOUR, PUBLIC_VAULT_SVC_URL (issue #22),
+  // ISSUE_CATEGORIES, PILOT_WARD_IDS, PILOT_WARD_NAMES_ML,
+  // PILOT_WARD_NAMES_EN, ISSUE_CREATE_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  // ISSUE_DRAFT_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  // ISSUE_PHOTO_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  // ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR (issue #24) — see .env.example.
 }
