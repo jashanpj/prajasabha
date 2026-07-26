@@ -540,3 +540,80 @@ export function loadDeliberationSweepAdminConfig(
     ipAllowlist: env.DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST,
   });
 }
+
+// Issue #33 — C1 Statement Submission & Voting. Two separate rate-limit
+// loaders, same "one loader per consumer file" reasoning as #24/#25/#26's
+// loaders above (statement submission and voting are different endpoint
+// files with different abuse profiles) — plus a third, admin-gate loader
+// for the minimal moderation endpoint, mirroring loadIssueMergeAdminConfig
+// exactly (no admin-role model exists yet, so this is the same
+// bearer-token + IP-allowlist two-factor treatment).
+
+const STATEMENT_SUBMIT_RATE_LIMIT_REQUIRED_VARS = [
+  "STATEMENT_SUBMIT_RATE_LIMIT_PER_MEMBER_PER_HOUR",
+] as const;
+
+const StatementSubmitRateLimitConfigSchema = z.object({
+  statementSubmitRateLimitPerMemberPerHour: z.coerce.number().int().positive(),
+});
+
+export type StatementSubmitRateLimitConfig = z.infer<typeof StatementSubmitRateLimitConfigSchema>;
+
+/** apps/web's POST /api/deliberations/:deliberationId/statements per-member hourly limit. */
+export function loadStatementSubmitRateLimitConfig(
+  env: Record<string, string | undefined>,
+): StatementSubmitRateLimitConfig {
+  const missing = STATEMENT_SUBMIT_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return StatementSubmitRateLimitConfigSchema.parse({
+    statementSubmitRateLimitPerMemberPerHour: env.STATEMENT_SUBMIT_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  });
+}
+
+const STATEMENT_VOTE_RATE_LIMIT_REQUIRED_VARS = [
+  "STATEMENT_VOTE_RATE_LIMIT_PER_MEMBER_PER_HOUR",
+] as const;
+
+const StatementVoteRateLimitConfigSchema = z.object({
+  statementVoteRateLimitPerMemberPerHour: z.coerce.number().int().positive(),
+});
+
+export type StatementVoteRateLimitConfig = z.infer<typeof StatementVoteRateLimitConfigSchema>;
+
+/** apps/web's POST /api/statements/:statementId/vote per-member hourly limit. */
+export function loadStatementVoteRateLimitConfig(
+  env: Record<string, string | undefined>,
+): StatementVoteRateLimitConfig {
+  const missing = STATEMENT_VOTE_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return StatementVoteRateLimitConfigSchema.parse({
+    statementVoteRateLimitPerMemberPerHour: env.STATEMENT_VOTE_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  });
+}
+
+const STATEMENT_MODERATION_ADMIN_REQUIRED_VARS = [
+  "STATEMENT_MODERATION_ADMIN_TOKEN",
+  "STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST",
+] as const;
+
+const StatementModerationAdminConfigSchema = z.object({
+  adminToken: z.string().min(1),
+  ipAllowlist: commaSeparatedList,
+});
+
+export type StatementModerationAdminConfig = z.infer<typeof StatementModerationAdminConfigSchema>;
+
+/** apps/web's POST /api/admin/statements/:statementId/moderate bearer token + IP allowlist. */
+export function loadStatementModerationAdminConfig(
+  env: Record<string, string | undefined>,
+): StatementModerationAdminConfig {
+  const missing = STATEMENT_MODERATION_ADMIN_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return StatementModerationAdminConfigSchema.parse({
+    adminToken: env.STATEMENT_MODERATION_ADMIN_TOKEN,
+    ipAllowlist: env.STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST,
+  });
+}

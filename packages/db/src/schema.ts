@@ -59,6 +59,9 @@ export const deliberationStateEnum = pgEnum("deliberation_state", [
   "closed",
   "summarized",
 ]);
+// Added in migration 0010 (issue #33's C1 Statement Submission & Voting).
+export const statementStatusEnum = pgEnum("statement_status", ["pending", "approved", "rejected"]);
+export const statementVoteEnum = pgEnum("statement_vote", ["agree", "disagree", "pass"]);
 
 export const members = pgTable(
   "members",
@@ -234,6 +237,58 @@ export const deliberations = pgTable(
     // on every run.
     index("deliberations_state_closes_at_idx").on(t.state, t.closesAt),
   ],
+);
+
+// Added in migration 0010 (issue #33 — C1 Statement Submission & Voting).
+// Statements are moderated (per the story's own text, "<=280 chars,
+// moderated queue") but Module H's real moderation console (issue #29)
+// doesn't exist yet — status defaults to 'pending' and is flipped by a
+// minimal admin-gated endpoint (mirroring #26's merge.ts bearer+IP
+// pattern), explicitly not a substitute for #29. The 280-char cap is
+// enforced at the Zod boundary only (packages/shared's schemas.ts), same
+// "fixed content-shape constant, not a DB CHECK" treatment as issues'
+// 5-photo cap — see photoKeys above.
+export const statements = pgTable(
+  "statements",
+  {
+    statementId: uuid("statement_id").primaryKey().defaultRandom(),
+    deliberationId: uuid("deliberation_id")
+      .notNull()
+      .references(() => deliberations.deliberationId),
+    authorMemberId: uuid("author_member_id")
+      .notNull()
+      .references(() => members.memberId),
+    body: text("body").notNull(),
+    status: statementStatusEnum("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // The "next statement to vote on" query (apps/web's
+    // /api/deliberations/:id/statements/next) filters
+    // deliberationId + status='approved' on every call.
+    index("statements_deliberation_id_status_idx").on(t.deliberationId, t.status),
+  ],
+);
+
+// Added in migration 0010. One vote per statement per member (issue #33's
+// own AC), enforced by the real unique(statementId, memberId) constraint
+// below — not a pre-check SELECT, same dedup precedent as
+// issue_support_issue_member_uniq. Not on CLAUDE.md's append-only table
+// list, and no update path is exposed in this phase either (no
+// "change your vote" feature) — simplest correct reading of the AC.
+export const statementVotes = pgTable(
+  "statement_votes",
+  {
+    statementId: uuid("statement_id")
+      .notNull()
+      .references(() => statements.statementId),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.memberId),
+    vote: statementVoteEnum("vote").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("statement_votes_statement_member_uniq").on(t.statementId, t.memberId)],
 );
 
 // Append-only (CLAUDE.md invariant 3): UPDATE/DELETE revoked from every

@@ -6,6 +6,9 @@ import {
   issuePhotoUploadSchema,
   issueSupportActionSchema,
   registrationRequestSchema,
+  statementCreateSchema,
+  statementModerationActionSchema,
+  statementVoteActionSchema,
 } from "./schemas";
 
 // Standard RFC 4122 example UUID (used widely in API docs) — deliberately
@@ -185,6 +188,83 @@ describe("issueSupportActionSchema (B3/B4)", () => {
   it("rejects a non-uuid issueId", () => {
     expect(() =>
       issueSupportActionSchema.parse({ issueId: "not-a-uuid", memberId: VALID_UUID }),
+    ).toThrow();
+  });
+});
+
+describe("statementCreateSchema (C1)", () => {
+  it("accepts a valid payload", () => {
+    expect(statementCreateSchema.parse({ body: "A short statement." })).toEqual({
+      body: "A short statement.",
+    });
+  });
+
+  it("accepts a body of exactly 280 characters", () => {
+    const body = "a".repeat(280);
+    expect(statementCreateSchema.parse({ body })).toEqual({ body });
+  });
+
+  it("rejects a body over 280 characters", () => {
+    expect(() => statementCreateSchema.parse({ body: "a".repeat(281) })).toThrow();
+  });
+
+  it("rejects an empty body", () => {
+    expect(() => statementCreateSchema.parse({ body: "" })).toThrow();
+  });
+
+  it("rejects a missing body", () => {
+    expect(() => statementCreateSchema.parse({})).toThrow();
+  });
+});
+
+describe("statementVoteActionSchema (C1)", () => {
+  it.each(["agree", "disagree", "pass"] as const)("accepts %s", (vote) => {
+    expect(statementVoteActionSchema.parse({ vote })).toEqual({ vote });
+  });
+
+  it("rejects an unrecognized vote value", () => {
+    expect(() => statementVoteActionSchema.parse({ vote: "abstain" })).toThrow();
+  });
+
+  it("rejects a missing vote", () => {
+    expect(() => statementVoteActionSchema.parse({})).toThrow();
+  });
+});
+
+describe("statementModerationActionSchema (C1 — admin-gated moderation)", () => {
+  it("accepts a valid approve payload without publicNote", () => {
+    expect(
+      statementModerationActionSchema.parse({ action: "approve", ruleCited: "civility" }),
+    ).toEqual({ action: "approve", ruleCited: "civility" });
+  });
+
+  it("accepts a valid reject payload with publicNote", () => {
+    expect(
+      statementModerationActionSchema.parse({
+        action: "reject",
+        ruleCited: "civility",
+        publicNote: "Contains a personal attack.",
+      }),
+    ).toEqual({
+      action: "reject",
+      ruleCited: "civility",
+      publicNote: "Contains a personal attack.",
+    });
+  });
+
+  it("rejects an unrecognized action", () => {
+    expect(() =>
+      statementModerationActionSchema.parse({ action: "delete", ruleCited: "civility" }),
+    ).toThrow();
+  });
+
+  it("rejects a missing ruleCited", () => {
+    expect(() => statementModerationActionSchema.parse({ action: "approve" })).toThrow();
+  });
+
+  it("rejects an empty ruleCited", () => {
+    expect(() =>
+      statementModerationActionSchema.parse({ action: "approve", ruleCited: "" }),
     ).toThrow();
   });
 });
