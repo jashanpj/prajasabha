@@ -78,45 +78,48 @@ const mlHref = `${currentPath}?lang=ml`;
 ---
 
 <nav class="ps-nav">
-  <a href={withLang("/")} class="ps-nav__brand">
-    <Logo size={32} color="var(--color-ivory)" />
-    <span>{APP_NAME}</span>
-  </a>
-  <div class="ps-nav__links">
-    <a href={withLang("/")} aria-current={currentPath === "/" ? "page" : undefined}
-      >{t["nav.home"]}</a
-    >
-    <a
-      href={withLang("/dashboard")}
-      aria-current={currentPath === "/dashboard" ? "page" : undefined}>{t["nav.dashboard"]}</a
-    >
-  </div>
-  <div class="ps-nav__right">
-    <div class="ps-nav__lang">
-      <a href={enHref} aria-current={locale === "en" ? "page" : undefined}>EN</a>
-      <span aria-hidden="true">·</span>
-      <a href={mlHref} aria-current={locale === "ml" ? "page" : undefined}>മലയാളം</a>
+  <div class="ps-nav__inner">
+    <a href={withLang("/")} class="ps-nav__brand">
+      <Logo size={32} color="var(--color-ivory)" />
+      <span>{APP_NAME}</span>
+    </a>
+    <div class="ps-nav__links">
+      <a href={withLang("/")} aria-current={currentPath === "/" ? "page" : undefined}
+        >{t["nav.home"]}</a
+      >
+      <a
+        href={withLang("/dashboard")}
+        aria-current={currentPath === "/dashboard" ? "page" : undefined}>{t["nav.dashboard"]}</a
+      >
     </div>
-    {
-      tier === "t2" ? (
-        <Badge
-          tier="t2"
-          ward={pilotConstituencyName}
-          label={t["epic.status.badge.verifiedConstituent"].replace(
-            "{ward}",
-            pilotConstituencyName ?? "",
-          )}
-        />
-      ) : (
-        <Button
-          variant="secondary"
-          href={withLang(!session ? "/register" : "/verify/epic")}
-          class="ps-nav__cta"
-        >
-          {t["nav.cta.verify"]}
-        </Button>
-      )
-    }
+    <div class="ps-nav__right">
+      <div class="ps-nav__lang">
+        <a href={enHref} aria-current={locale === "en" ? "page" : undefined}>EN</a>
+        <span aria-hidden="true">·</span>
+        <a href={mlHref} aria-current={locale === "ml" ? "page" : undefined}>മലയാളം</a>
+      </div>
+      {
+        tier === "t2" ? (
+          <Badge
+            tier="t2"
+            ward={pilotConstituencyName}
+            label={t["epic.status.badge.verifiedConstituent"].replace(
+              "{ward}",
+              pilotConstituencyName ?? "",
+            )}
+            class="ps-nav__badge"
+          />
+        ) : (
+          <Button
+            variant="secondary"
+            href={withLang(!session ? "/register" : "/verify/epic")}
+            class="ps-nav__cta"
+          >
+            {t["nav.cta.verify"]}
+          </Button>
+        )
+      }
+    </div>
   </div>
 </nav>
 <TricolourHairline />
@@ -129,12 +132,19 @@ const mlHref = `${currentPath}?lang=ml`;
 
 <style>
   .ps-nav {
+    background: var(--color-navy);
+    color: var(--color-ivory);
+  }
+  /* Mockup (web/home.dc.html:21): navbar content is centered at
+     max-width:1200px, not full-bleed — the navy background itself stays
+     full-bleed on `.ps-nav`, only this inner wrapper is constrained. */
+  .ps-nav__inner {
     display: flex;
     align-items: center;
     gap: 1.5em;
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 0.75em 1.5em;
-    background: var(--color-navy);
-    color: var(--color-ivory);
   }
   .ps-nav__brand {
     display: flex;
@@ -192,6 +202,18 @@ const mlHref = `${currentPath}?lang=ml`;
     background: var(--color-ivory);
     border-color: var(--color-ivory);
     color: var(--color-navy);
+  }
+  /* Mockup (web/dashboard.dc.html:36): the T2 badge sitting directly on
+     the navy bar uses a translucent on-navy treatment, not the standard
+     ivory-context Badge colors (which read as low-contrast on navy). */
+  :global(.ps-nav__badge.ps-badge--t2) {
+    background: var(--badge-t2-on-navy-fill);
+    border-color: var(--badge-t2-on-navy-border);
+    color: var(--badge-t2-on-navy-text);
+  }
+  :global(.ps-nav__badge.ps-badge--t2 .ps-badge__icon) {
+    background: var(--color-green);
+    color: var(--color-ivory);
   }
   .ps-footer {
     background: var(--color-navy);
