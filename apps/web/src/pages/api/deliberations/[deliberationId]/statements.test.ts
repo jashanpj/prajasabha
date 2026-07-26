@@ -250,7 +250,7 @@ describe("handleStatementCreate (POST /api/deliberations/:deliberationId/stateme
         cookie,
       );
       expect(res.status).toBe(201);
-      const json = await res.json();
+      const json = (await res.json()) as { statementId: string };
       expect(json.statementId).toBeTruthy();
 
       const [row] = await db
