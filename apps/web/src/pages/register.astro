@@ -1,7 +1,6 @@
 ---
 import Button from "../components/Button.astro";
-import Logo from "../components/Logo.astro";
-import TricolourHairline from "../components/TricolourHairline.astro";
+import SiteChrome from "../components/SiteChrome.astro";
 import "../styles/global.css";
 import en from "../i18n/en.json";
 import ml from "../i18n/ml.json";
@@ -35,27 +34,26 @@ const magicLinkTtlMinutes = import.meta.env.DEV
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   </head>
   <body>
-    <header>
-      <Logo size={40} />
-      <h1>{t["register.title"]}</h1>
-    </header>
-    <TricolourHairline />
+    <SiteChrome locale={locale}>
+      <div class="ps-card ps-form">
+        <h1>{t["register.title"]}</h1>
 
-    <form id="register-form">
-      <label>
-        {t["register.email.label"]}
-        <input type="email" name="email" required />
-      </label>
-      <label>
-        {t["register.pseudonym.label"]}
-        <input type="text" name="pseudonym" minlength="3" maxlength="32" required />
-      </label>
-      <p>{t["register.pseudonym.hint"]}</p>
-      <input type="hidden" name="locale" value={locale} />
-      <div class="cf-turnstile" data-sitekey={siteKey}></div>
-      <p id="register-error" role="alert" hidden></p>
-      <Button type="submit">{t["register.submit"]}</Button>
-    </form>
+        <form id="register-form">
+          <label>
+            {t["register.email.label"]}
+            <input type="email" name="email" required />
+          </label>
+          <label>
+            {t["register.pseudonym.label"]}
+            <input type="text" name="pseudonym" minlength="3" maxlength="32" required />
+          </label>
+          <p class="ps-form-hint">{t["register.pseudonym.hint"]}</p>
+          <input type="hidden" name="locale" value={locale} />
+          <div class="cf-turnstile" data-sitekey={siteKey}></div>
+          <p id="register-error" class="ps-form-error" role="alert" hidden></p>
+          <Button type="submit">{t["register.submit"]}</Button>
+        </form>
+      </div>
 
     <script define:vars={{ errors: t, magicLinkTtlMinutes }} type="module">
       const form = document.getElementById("register-form");
@@ -102,5 +100,6 @@ const magicLinkTtlMinutes = import.meta.env.DEV
         }
       });
     </script>
+    </SiteChrome>
   </body>
 </html>

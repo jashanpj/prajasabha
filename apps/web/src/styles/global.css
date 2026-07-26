@@ -31,3 +31,66 @@ h1 {
 h2 {
   font-size: var(--font-size-heading);
 }
+
+/* Shared card/form visual language (issue #91) — white bordered card,
+   navy-token form controls. Global rather than duplicated per-page
+   <style> blocks since register.astro, verify/epic.astro, and
+   issues/new.astro all need the identical treatment. */
+.ps-card {
+  background: var(--color-card-fill);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-card);
+  padding: 1.5em;
+}
+
+.ps-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1em;
+  max-width: 28em;
+}
+
+/* .ps-form's `display: flex` ties the native [hidden] UA rule's
+   specificity and wins on cascade order (author styles beat the UA
+   stylesheet) — without this, a [hidden] .ps-form would incorrectly
+   render. Same fix applies to .ps-card, used directly on <section
+   hidden> in issues/new.astro's step 3. */
+.ps-form[hidden],
+.ps-card[hidden] {
+  display: none;
+}
+
+.ps-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  font-weight: 600;
+}
+
+.ps-form input,
+.ps-form select,
+.ps-form textarea {
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body);
+  padding: 0.6em 0.8em;
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-button);
+  background: var(--color-ivory);
+  color: var(--color-charcoal);
+}
+
+.ps-form-hint {
+  color: var(--color-muted);
+  font-size: var(--font-size-caption);
+  margin: 0;
+}
+
+/* Errors: no dedicated "danger" token exists in the design system, so —
+   same non-color-alone treatment as issues/new.astro's .ps-warning — a
+   saffron left border + bold text carries the signal, not color alone. */
+.ps-form-error {
+  border-left: 3px solid var(--color-saffron);
+  padding: 0.5em 0.75em;
+  font-weight: 600;
+  margin: 0;
+}

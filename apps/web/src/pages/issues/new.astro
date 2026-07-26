@@ -1,7 +1,6 @@
 ---
 import Button from "../../components/Button.astro";
-import Logo from "../../components/Logo.astro";
-import TricolourHairline from "../../components/TricolourHairline.astro";
+import SiteChrome from "../../components/SiteChrome.astro";
 import "../../styles/global.css";
 import en from "../../i18n/en.json";
 import ml from "../../i18n/ml.json";
@@ -56,26 +55,23 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
     <title>{t["issue.new.title"]}</title>
   </head>
   <body>
-    <header>
-      <Logo size={40} />
+    <SiteChrome locale={locale}>
       <h1>{t["issue.new.title"]}</h1>
-    </header>
-    <TricolourHairline />
 
     <!-- Step 1: ward → create draft -->
-    <form id="start-form">
+    <form id="start-form" class="ps-card ps-form">
       <label>
         {t["issue.new.ward.label"]}
         <select name="wardId" required>
           {wards.map((ward) => <option value={ward.id}>{wardLabel(ward)}</option>)}
         </select>
       </label>
-      <p id="start-error" role="alert" hidden></p>
+      <p id="start-error" class="ps-form-error" role="alert" hidden></p>
       <Button type="submit">{t["issue.new.start"]}</Button>
     </form>
 
     <!-- Step 2: the draft form (revealed once the draft row exists) -->
-    <form id="issue-form" hidden>
+    <form id="issue-form" class="ps-card ps-form" hidden>
       <label>
         {t["issue.new.titleMl.label"]}
         <input type="text" name="titleMl" maxlength="200" required />
@@ -103,19 +99,19 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
 
       <fieldset>
         <legend>{t["issue.new.photos.label"]}</legend>
-        <p>{t["issue.new.photos.hint"]}</p>
+        <p class="ps-form-hint">{t["issue.new.photos.hint"]}</p>
         <p class="ps-warning" role="note">{t["issue.new.photos.piiWarning"]}</p>
         <input type="file" id="photo-input" accept="image/jpeg,image/png" />
-        <p id="photo-count" aria-live="polite"></p>
+        <p id="photo-count" class="ps-form-hint" aria-live="polite"></p>
       </fieldset>
 
-      <p id="autosave-status" aria-live="polite"></p>
-      <p id="issue-error" role="alert" hidden></p>
+      <p id="autosave-status" class="ps-form-hint" aria-live="polite"></p>
+      <p id="issue-error" class="ps-form-error" role="alert" hidden></p>
       <Button type="submit">{t["issue.new.publish"]}</Button>
     </form>
 
     <!-- Step 3: published confirmation -->
-    <section id="published" hidden>
+    <section id="published" class="ps-card" hidden>
       <h2>{t["issue.new.published.title"]}</h2>
       <p>{t["issue.new.published.body"]}</p>
       <a id="published-issue-link" href="#">{t["issue.new.published.viewLink"]}</a>
@@ -323,6 +319,12 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
         padding: 0.5em 0.75em;
         font-weight: 600;
       }
+      #start-form,
+      #issue-form,
+      #published {
+        margin: 1.5em;
+      }
     </style>
+    </SiteChrome>
   </body>
 </html>

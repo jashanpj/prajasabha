@@ -1,7 +1,6 @@
 ---
 import Button from "../../components/Button.astro";
-import Logo from "../../components/Logo.astro";
-import TricolourHairline from "../../components/TricolourHairline.astro";
+import SiteChrome from "../../components/SiteChrome.astro";
 import "../../styles/global.css";
 import { verifySession } from "shared";
 import en from "../../i18n/en.json";
@@ -41,30 +40,29 @@ const memberId = session.memberId;
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   </head>
   <body>
-    <header>
-      <Logo size={40} />
-      <h1>{t["epic.title"]}</h1>
-    </header>
-    <TricolourHairline />
+    <SiteChrome locale={locale}>
+      <div class="ps-card ps-form">
+        <h1>{t["epic.title"]}</h1>
 
-    <form id="epic-form">
-      <label>
-        {t["epic.epicNumber.label"]}
-        <input type="text" name="epicNumber" required />
-      </label>
-      <p>{t["epic.epicNumber.hint"]}</p>
-      <label>
-        {t["epic.assemblySegment.label"]}
-        <input type="text" name="assemblySegmentClaimed" required />
-      </label>
-      <label>
-        {t["epic.doc.label"]}
-        <input type="file" name="doc" accept="image/*,application/pdf" required />
-      </label>
-      <div class="cf-turnstile" data-sitekey={siteKey}></div>
-      <p id="epic-error" role="alert" hidden></p>
-      <Button type="submit">{t["epic.submit"]}</Button>
-    </form>
+        <form id="epic-form">
+          <label>
+            {t["epic.epicNumber.label"]}
+            <input type="text" name="epicNumber" required />
+          </label>
+          <p class="ps-form-hint">{t["epic.epicNumber.hint"]}</p>
+          <label>
+            {t["epic.assemblySegment.label"]}
+            <input type="text" name="assemblySegmentClaimed" required />
+          </label>
+          <label>
+            {t["epic.doc.label"]}
+            <input type="file" name="doc" accept="image/*,application/pdf" required />
+          </label>
+          <div class="cf-turnstile" data-sitekey={siteKey}></div>
+          <p id="epic-error" class="ps-form-error" role="alert" hidden></p>
+          <Button type="submit">{t["epic.submit"]}</Button>
+        </form>
+      </div>
 
     <script
       define:vars={{ errors: t, memberId, vaultSvcPublicUrl }}
@@ -141,5 +139,6 @@ const memberId = session.memberId;
         }
       });
     </script>
+    </SiteChrome>
   </body>
 </html>
