@@ -116,7 +116,59 @@ async function insertIssue(
 
 async function deleteIssue(issueId: string): Promise<void> {
   const db = getServiceRoleDb(appDatabaseUrl());
+  // #25's router now runs on every publish — a default 'roads' issue in
+  // ALLOWED_WARD_ID (one of the two real seeded pilot wards, migration
+  // 0005) really does match the seeded routing_rules, so any test in this
+  // file that publishes can leave real `routings` rows behind. Clear those
+  // first or the FK from routings.issue_id blocks this delete.
+  await db.delete(schema.routings).where(eq(schema.routings.issueId, issueId));
   await db.delete(schema.issues).where(eq(schema.issues.issueId, issueId));
+}
+
+// Issue #25 (B2 — Responsibility Router). Publishing an issue whose saved
+// category/wardId matches a `routing_rules` row should insert one
+// `routings` row per matched authority right after the status flips to
+// 'published' — a "not yet routed" issue (zero routings) is still a valid
+// publish, per the approved plan ("routing gaps shouldn't block publish").
+
+async function insertAuthority(
+  kind: "councillor" | "ulb" | "mla" | "mp" | "dept" | "agency" = "ulb",
+): Promise<string> {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  const suffix = randomUUID().slice(0, 8);
+  const [inserted] = await db
+    .insert(schema.authorities)
+    .values({ kind, nameMl: `അതോറിറ്റി ${suffix}`, nameEn: `Authority ${suffix}` })
+    .returning({ authorityId: schema.authorities.authorityId });
+  if (!inserted) throw new Error("authority insert returned no row");
+  return inserted.authorityId;
+}
+
+async function insertRoutingRule(fields: {
+  category: string;
+  wardId: string | null;
+  authorityId: string;
+  role: "responsible" | "copied";
+}): Promise<void> {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  await db.insert(schema.routingRules).values({
+    category: fields.category,
+    wardId: fields.wardId,
+    authorityId: fields.authorityId,
+    role: fields.role,
+  });
+}
+
+async function cleanupAuthority(authorityId: string): Promise<void> {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  await db.delete(schema.routings).where(eq(schema.routings.authorityId, authorityId));
+  await db.delete(schema.routingRules).where(eq(schema.routingRules.authorityId, authorityId));
+  await db.delete(schema.authorities).where(eq(schema.authorities.authorityId, authorityId));
+}
+
+async function getRoutingsForIssue(issueId: string) {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  return db.select().from(schema.routings).where(eq(schema.routings.issueId, issueId));
 }
 
 async function getIssue(issueId: string) {
@@ -304,6 +356,68 @@ describe("handlePublish (POST /api/issues/:issueId/publish)", () => {
     } finally {
       if (issueIdA) await deleteIssue(issueIdA);
       if (issueIdB) await deleteIssue(issueIdB);
+      await deleteMember(memberId);
+    }
+  });
+
+  it("publishing an issue whose category/wardId matches a routing_rules row creates a routings row for the matched authority", async () => {
+    const memberId = await insertMember("t1");
+    const authorityId = await insertAuthority("ulb");
+    // A unique category, not one of migration 0005's seeded
+    // roads/water/electricity rules — so the only routing_rules row that
+    // can match this issue is the one this test inserts itself, keeping
+    // the toHaveLength(1) assertion below independent of real seed data.
+    const category = `publish-test-routing-${randomUUID().slice(0, 8)}`;
+    let issueId: string | undefined;
+    try {
+      await insertRoutingRule({
+        category,
+        wardId: null,
+        authorityId,
+        role: "responsible",
+      });
+
+      issueId = await insertIssue(memberId, { category, wardId: ALLOWED_WARD_ID });
+      const cookie = await sessionCookie(memberId);
+      const res = await callPublish(
+        testEnv({ ISSUE_CATEGORIES: `roads,water,electricity,${category}` }),
+        issueId,
+        cookie,
+      );
+      expect(res.status).toBe(200);
+
+      const routings = await getRoutingsForIssue(issueId);
+      expect(routings).toHaveLength(1);
+      expect(routings[0]?.authorityId).toBe(authorityId);
+      expect(routings[0]?.role).toBe("responsible");
+    } finally {
+      if (issueId) await deleteIssue(issueId);
+      await deleteMember(memberId);
+      await cleanupAuthority(authorityId);
+    }
+  });
+
+  it("publishing an issue with no matching routing_rules row still succeeds with zero routings", async () => {
+    const memberId = await insertMember("t1");
+    let issueId: string | undefined;
+    try {
+      // "streetlight" has no routing_rules row seeded anywhere (migration
+      // 0005 only seeds roads/water/electricity) — no rule should ever
+      // match it. Overriding ISSUE_CATEGORIES here since the file's shared
+      // testEnv() only allow-lists roads/water/electricity.
+      issueId = await insertIssue(memberId, { category: "streetlight", wardId: ALLOWED_WARD_ID });
+      const cookie = await sessionCookie(memberId);
+      const res = await callPublish(
+        testEnv({ ISSUE_CATEGORIES: "roads,water,electricity,streetlight" }),
+        issueId,
+        cookie,
+      );
+      expect(res.status).toBe(200);
+
+      const routings = await getRoutingsForIssue(issueId);
+      expect(routings).toEqual([]);
+    } finally {
+      if (issueId) await deleteIssue(issueId);
       await deleteMember(memberId);
     }
   });

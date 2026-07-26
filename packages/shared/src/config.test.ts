@@ -4,6 +4,7 @@ import {
   loadEpicLinkRateLimitConfig,
   loadEpicSubmitRateLimitConfig,
   loadEpicVerificationConfig,
+  loadFlagRoutingRateLimitConfig,
   loadIssueCategoriesConfig,
   loadIssueCreateRateLimitConfig,
   loadIssueDraftRateLimitConfig,
@@ -430,6 +431,26 @@ describe("loadIssuePublishRateLimitConfig (B1 — issue #24)", () => {
   it("rejects a non-positive rate limit", () => {
     expect(() =>
       loadIssuePublishRateLimitConfig({ ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
+    ).toThrow();
+  });
+});
+
+describe("loadFlagRoutingRateLimitConfig (B2 — issue #25)", () => {
+  it("resolves the per-member rate limit from env", () => {
+    expect(
+      loadFlagRoutingRateLimitConfig({ FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR: "10" }),
+    ).toEqual({ flagRoutingRateLimitPerMemberPerHour: 10 });
+  });
+
+  it("throws when env is empty", () => {
+    expect(() => loadFlagRoutingRateLimitConfig({})).toThrow(
+      /FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR/,
+    );
+  });
+
+  it("rejects a non-positive rate limit", () => {
+    expect(() =>
+      loadFlagRoutingRateLimitConfig({ FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
     ).toThrow();
   });
 });

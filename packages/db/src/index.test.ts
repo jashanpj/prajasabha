@@ -16,6 +16,7 @@ describe("packages/db entrypoint", () => {
         "members",
         "moderationActions",
         "routingRoleEnum",
+        "routingRules",
         "routings",
       ].sort(),
     );

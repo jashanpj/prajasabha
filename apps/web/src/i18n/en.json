@@ -73,5 +73,19 @@
   "issue.category.electricity": "Electricity",
   "issue.category.waste": "Waste management",
   "issue.category.streetlight": "Street lighting",
-  "issue.category.other": "Other"
+  "issue.category.other": "Other",
+  "issue.routing.role.responsible": "Responsible",
+  "issue.routing.role.copied": "Copied — for information",
+  "issue.detail.routing.title": "Who's responsible",
+  "issue.detail.routing.empty": "This issue hasn't been routed to an authority yet.",
+  "issue.detail.flag.button": "Flag incorrect routing",
+  "issue.detail.flag.note.label": "What's wrong? (optional)",
+  "issue.detail.flag.submitting": "Submitting…",
+  "issue.detail.flag.success": "Thanks — this has been sent for admin review.",
+  "issue.detail.flag.loginPrompt": "Sign in to flag incorrect routing.",
+  "issue.detail.flag.error.unauthorized": "Please sign in first.",
+  "issue.detail.flag.error.still_draft": "This issue isn't published yet.",
+  "issue.detail.flag.error.rate_limited": "You've hit the hourly limit for this action. Please try again later.",
+  "issue.detail.flag.error.generic": "Something went wrong. Please try again.",
+  "issue.detail.notFound": "This issue doesn't exist or isn't published yet."
 }

@@ -112,6 +112,62 @@ describe("authorities RLS (public directory, no status gate)", () => {
   });
 });
 
+describe("routing_rules RLS (internal, no public read)", () => {
+  // Issue #25 (B2 — Responsibility Router). Unlike `authorities` (public
+  // directory, no status gate — see above), `routing_rules` is internal
+  // admin-maintained routing config per the approved plan: it's never
+  // rendered directly, only its *output* (a `routings` row inserted at
+  // publish time) is public. So it ships with NO anon/authenticated SELECT
+  // policy at all — service_role only. The table doesn't exist yet (no
+  // migration lands until #25's implementation), so every case here fails
+  // with a "relation does not exist" error until that migration ships.
+
+  it("anon cannot SELECT routing_rules at all", async () => {
+    await expect(
+      withRole(databaseUrl, "anon", (client) =>
+        client.query("SELECT * FROM routing_rules LIMIT 1"),
+      ),
+    ).rejects.toThrow(/permission denied|does not exist/);
+  });
+
+  it("authenticated cannot SELECT routing_rules at all", async () => {
+    await expect(
+      withRole(databaseUrl, "authenticated", (client) =>
+        client.query("SELECT * FROM routing_rules LIMIT 1"),
+      ),
+    ).rejects.toThrow(/permission denied|does not exist/);
+  });
+
+  it("service_role can read and write routing_rules", async () => {
+    const authorityId = await withRole(databaseUrl, "service_role", async (client) => {
+      const authority = await client.query<{ authority_id: string }>(
+        "INSERT INTO authorities (kind, name_ml, name_en) VALUES ('ulb', 'ml', 'en') RETURNING authority_id",
+      );
+      return firstRow(authority.rows).authority_id;
+    });
+
+    try {
+      const rows = await withRole(databaseUrl, "service_role", async (client) => {
+        await client.query(
+          `INSERT INTO routing_rules (category, ward_id, authority_id, role, legal_basis_ref)
+           VALUES ('roads', NULL, $1, 'responsible', 'kerala-municipality-act-1994')`,
+          [authorityId],
+        );
+        const result = await client.query("SELECT * FROM routing_rules WHERE authority_id = $1", [
+          authorityId,
+        ]);
+        return result.rows;
+      });
+      expect(rows).toHaveLength(1);
+    } finally {
+      await withRole(databaseUrl, "service_role", async (client) => {
+        await client.query("DELETE FROM routing_rules WHERE authority_id = $1", [authorityId]);
+        await client.query("DELETE FROM authorities WHERE authority_id = $1", [authorityId]);
+      });
+    }
+  });
+});
+
 describe("routings RLS (join-gated on published issues)", () => {
   it("anon cannot see routings for a draft issue", async () => {
     const authorityId = await withRole(databaseUrl, "service_role", async (client) => {

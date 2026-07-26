@@ -66,5 +66,7 @@ declare namespace Cloudflare {
     ISSUE_DRAFT_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
     ISSUE_PHOTO_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
     ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
+    // Issue #25 — B2 "flag misrouting" endpoint per-member hourly limit.
+    FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
   }
 }

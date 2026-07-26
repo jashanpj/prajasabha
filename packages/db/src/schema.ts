@@ -136,6 +136,29 @@ export const routings = pgTable("routings", {
   legalBasisRef: text("legal_basis_ref"),
 });
 
+// Added in migration 0005 (issue #25's B2 Responsibility Router). Pure
+// category/ward/authority/legal-citation reference data — no identity
+// attributes, so the vault join rule doesn't apply. Admin-maintained input
+// to the router (HLD §6: "Router = SQL rules table ... editable in admin");
+// its *output* (one `routings` row per match, computed at publish time) is
+// what's ever public — this table itself gets service_role-only RLS, no
+// anon/authenticated read policy at all (see migrations/0005_*.sql).
+export const routingRules = pgTable("routing_rules", {
+  ruleId: uuid("rule_id").primaryKey().defaultRandom(),
+  // Free-text taxonomy, matches issues.category's allow-list-at-the-Zod-
+  // boundary convention above — not a DB enum.
+  category: text("category").notNull(),
+  // NULL = applies to every ward in this single-constituency pilot; a
+  // concrete wardId = ward-specific override/addition (e.g. a per-ward
+  // Councillor rule alongside a wildcard ULB rule for the same category).
+  wardId: uuid("ward_id"),
+  authorityId: uuid("authority_id")
+    .notNull()
+    .references(() => authorities.authorityId),
+  role: routingRoleEnum("role").notNull(),
+  legalBasisRef: text("legal_basis_ref"),
+});
+
 // Append-only (CLAUDE.md invariant 3): UPDATE/DELETE revoked from every
 // role, including service_role, in the migration. Corrections are new rows,
 // never edits — kind/subjectType stay free text since new event kinds are

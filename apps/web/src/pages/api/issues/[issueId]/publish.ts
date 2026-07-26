@@ -10,6 +10,7 @@ import {
   verifySession,
 } from "shared";
 import { getServiceRoleDb } from "../../../../lib/db";
+import { computeRouting } from "../../../../lib/router";
 
 // B1 — publish a draft (issue #24). Same 401/404/403 guards as draft.ts,
 // plus 409 if the issue is past draft already. There is NO new request
@@ -113,6 +114,26 @@ export async function handlePublish(
     .update(schema.issues)
     .set({ status: "published", slug })
     .where(eq(schema.issues.issueId, issueId));
+
+  // B2 — Responsibility Router (issue #25). Routing is computed once, at
+  // publish time, not on-the-fly at render time — see the approved plan's
+  // rationale (a per-issue audit trail; later rules-table edits don't
+  // silently reroute already-published issues). No match is a valid
+  // outcome (a "not yet routed" issue), not a publish-blocking error.
+  const routings = await computeRouting(db, {
+    category: shape.data.category,
+    wardId: shape.data.wardId,
+  });
+  if (routings.length > 0) {
+    await db.insert(schema.routings).values(
+      routings.map((routing) => ({
+        issueId,
+        authorityId: routing.authorityId,
+        role: routing.role,
+        legalBasisRef: routing.legalBasisRef,
+      })),
+    );
+  }
 
   return Response.json({ slug });
 }

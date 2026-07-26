@@ -375,3 +375,32 @@ export function loadIssuePublishRateLimitConfig(
     issuePublishRateLimitPerMemberPerHour: env.ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR,
   });
 }
+
+// Issue #25 — B2 "flag misrouting" endpoint. Same per-member (not per-IP)
+// treatment as issue #24's four loaders above (session-authed, no
+// enumeration risk), added here as a fifth separate loader rather than
+// folded into any of the above — this endpoint's file is distinct from
+// create.ts/draft.ts/photos.ts/publish.ts, so the same "bundling forces
+// unrelated tests to stub each other's limits" reasoning applies.
+
+const FLAG_ROUTING_RATE_LIMIT_REQUIRED_VARS = [
+  "FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR",
+] as const;
+
+const FlagRoutingRateLimitConfigSchema = z.object({
+  flagRoutingRateLimitPerMemberPerHour: z.coerce.number().int().positive(),
+});
+
+export type FlagRoutingRateLimitConfig = z.infer<typeof FlagRoutingRateLimitConfigSchema>;
+
+/** apps/web's "flag misrouting" endpoint per-member hourly limit (issue #25 — B2). */
+export function loadFlagRoutingRateLimitConfig(
+  env: Record<string, string | undefined>,
+): FlagRoutingRateLimitConfig {
+  const missing = FLAG_ROUTING_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return FlagRoutingRateLimitConfigSchema.parse({
+    flagRoutingRateLimitPerMemberPerHour: env.FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  });
+}
