@@ -8,8 +8,10 @@ import {
   loadIssueCategoriesConfig,
   loadIssueCreateRateLimitConfig,
   loadIssueDraftRateLimitConfig,
+  loadIssueMergeAdminConfig,
   loadIssuePhotoRateLimitConfig,
   loadIssuePublishRateLimitConfig,
+  loadIssueSupportRateLimitConfig,
   loadMagicLinkConfig,
   loadPilotWardsConfig,
   loadRateLimitConfig,
@@ -451,6 +453,99 @@ describe("loadFlagRoutingRateLimitConfig (B2 — issue #25)", () => {
   it("rejects a non-positive rate limit", () => {
     expect(() =>
       loadFlagRoutingRateLimitConfig({ FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
+    ).toThrow();
+  });
+});
+
+// Issue #26 — B3 (Support & Dedup). Same per-member (not per-IP) treatment
+// as #24/#25's loaders above — support.ts is session-authed, so no
+// enumeration risk — added as its own loader, same "distinct consumer file"
+// reasoning as loadFlagRoutingRateLimitConfig.
+
+describe("loadIssueSupportRateLimitConfig (B3 — issue #26)", () => {
+  it("resolves the per-member rate limit from env", () => {
+    expect(
+      loadIssueSupportRateLimitConfig({ ISSUE_SUPPORT_RATE_LIMIT_PER_MEMBER_PER_HOUR: "20" }),
+    ).toEqual({ issueSupportRateLimitPerMemberPerHour: 20 });
+  });
+
+  it("throws when env is empty", () => {
+    expect(() => loadIssueSupportRateLimitConfig({})).toThrow(
+      /ISSUE_SUPPORT_RATE_LIMIT_PER_MEMBER_PER_HOUR/,
+    );
+  });
+
+  it("rejects a non-positive rate limit", () => {
+    expect(() =>
+      loadIssueSupportRateLimitConfig({ ISSUE_SUPPORT_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
+    ).toThrow();
+  });
+});
+
+// Issue #26 — B3's admin-only merge endpoint. There is no admin-role model
+// anywhere in this codebase yet (per the approved plan), so this mirrors
+// apps/vault-svc's loadReviewQueueConfig comma-separated IP allowlist
+// pattern almost verbatim, plus a required non-empty bearer token (the
+// second, independent factor requireAdminAccess checks — a leaked
+// merge-admin token must not by itself grant access from a non-allow-listed
+// IP, and vice versa).
+
+describe("loadIssueMergeAdminConfig (B3 — issue #26)", () => {
+  it("resolves the admin token and a comma-separated IP allowlist from env", () => {
+    expect(
+      loadIssueMergeAdminConfig({
+        ISSUE_MERGE_ADMIN_TOKEN: "merge-admin-token",
+        ISSUE_MERGE_ADMIN_IP_ALLOWLIST: "203.0.113.10,203.0.113.11",
+      }),
+    ).toEqual({
+      adminToken: "merge-admin-token",
+      ipAllowlist: ["203.0.113.10", "203.0.113.11"],
+    });
+  });
+
+  it("trims whitespace around each allowlisted IP", () => {
+    expect(
+      loadIssueMergeAdminConfig({
+        ISSUE_MERGE_ADMIN_TOKEN: "merge-admin-token",
+        ISSUE_MERGE_ADMIN_IP_ALLOWLIST: " 203.0.113.10 , 203.0.113.11 ",
+      }),
+    ).toEqual({
+      adminToken: "merge-admin-token",
+      ipAllowlist: ["203.0.113.10", "203.0.113.11"],
+    });
+  });
+
+  it("resolves a single-IP allowlist without a trailing comma", () => {
+    expect(
+      loadIssueMergeAdminConfig({
+        ISSUE_MERGE_ADMIN_TOKEN: "merge-admin-token",
+        ISSUE_MERGE_ADMIN_IP_ALLOWLIST: "203.0.113.10",
+      }),
+    ).toEqual({ adminToken: "merge-admin-token", ipAllowlist: ["203.0.113.10"] });
+  });
+
+  it("throws when env is empty (no silent fallback — CLAUDE.md invariant 6)", () => {
+    expect(() => loadIssueMergeAdminConfig({})).toThrow(/Missing required config env var/);
+  });
+
+  it("throws naming the missing admin token var", () => {
+    expect(() =>
+      loadIssueMergeAdminConfig({ ISSUE_MERGE_ADMIN_IP_ALLOWLIST: "203.0.113.10" }),
+    ).toThrow(/ISSUE_MERGE_ADMIN_TOKEN/);
+  });
+
+  it("throws naming the missing IP allowlist var", () => {
+    expect(() =>
+      loadIssueMergeAdminConfig({ ISSUE_MERGE_ADMIN_TOKEN: "merge-admin-token" }),
+    ).toThrow(/ISSUE_MERGE_ADMIN_IP_ALLOWLIST/);
+  });
+
+  it("rejects an empty admin token", () => {
+    expect(() =>
+      loadIssueMergeAdminConfig({
+        ISSUE_MERGE_ADMIN_TOKEN: "",
+        ISSUE_MERGE_ADMIN_IP_ALLOWLIST: "203.0.113.10",
+      }),
     ).toThrow();
   });
 });

@@ -65,13 +65,27 @@ const [issue] = await db
     body: schema.issues.body,
     category: schema.issues.category,
     status: schema.issues.status,
+    mergedInto: schema.issues.mergedInto,
+    supportT2Count: schema.issues.supportT2Count,
   })
   .from(schema.issues)
   .where(eq(schema.issues.slug, slug))
   .limit(1);
 
-if (!issue || issue.status !== "published") {
+// B3 (issue #26): a merged issue's own page must stay reachable ("merge
+// preserves both threads' history") — only draft/closed are hidden.
+if (!issue || (issue.status !== "published" && issue.status !== "merged")) {
   return notFoundResponse();
+}
+
+let mergedIntoSlug: string | null = null;
+if (issue.status === "merged" && issue.mergedInto) {
+  const [target] = await db
+    .select({ slug: schema.issues.slug })
+    .from(schema.issues)
+    .where(eq(schema.issues.issueId, issue.mergedInto))
+    .limit(1);
+  mergedIntoSlug = target?.slug ?? null;
 }
 
 const routingRows = await db
@@ -107,6 +121,54 @@ const explainers = explainerEntries.filter((entry) => entry !== undefined);
 const title = locale === "en" ? issue.titleEn : issue.titleMl;
 const categoryLabel = t[`issue.category.${issue.category}`] ?? issue.category;
 const memberId = session?.memberId ?? null;
+
+// B3 (issue #26) — support/dedup: supporter pseudonyms + a per-ward
+// breakdown, plus a T2-gated support form. None of this applies to a
+// merged issue (its own supportT2Count is frozen at merge time and its
+// issue_support rows have already moved to the target).
+const DEV_WARDS = [
+  { id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", nameMl: "ടെസ്റ്റ് വാർഡ് 1", nameEn: "Test Ward 1" },
+  { id: "5b1b6e1e-1c1a-4e1a-9c1a-2c963f66afa6", nameMl: "ടെസ്റ്റ് വാർഡ് 2", nameEn: "Test Ward 2" },
+];
+let pilotWards = DEV_WARDS;
+if (!import.meta.env.DEV) {
+  const { loadPilotWardsConfig } = await import("shared");
+  pilotWards = loadPilotWardsConfig(
+    env as unknown as Record<string, string | undefined>,
+  ).pilotWards;
+}
+function wardName(wardId: string): string {
+  const ward = pilotWards.find((w) => w.id === wardId);
+  if (!ward) return t["issue.detail.support.wardBreakdown.other"];
+  return locale === "en" ? ward.nameEn : ward.nameMl;
+}
+
+let supporterRows: { pseudonym: string; wardId: string }[] = [];
+let memberTier: "t0" | "t1" | "t2" | null = null;
+if (issue.status === "published") {
+  supporterRows = await db
+    .select({ pseudonym: schema.members.pseudonym, wardId: schema.issueSupport.wardId })
+    .from(schema.issueSupport)
+    .innerJoin(schema.members, eq(schema.issueSupport.memberId, schema.members.memberId))
+    .where(eq(schema.issueSupport.issueId, issue.issueId));
+
+  if (memberId) {
+    const [member] = await db
+      .select({ tier: schema.members.tier })
+      .from(schema.members)
+      .where(eq(schema.members.memberId, memberId))
+      .limit(1);
+    memberTier = member?.tier ?? null;
+  }
+}
+
+const wardCounts = new Map<string, number>();
+for (const row of supporterRows) {
+  wardCounts.set(row.wardId, (wardCounts.get(row.wardId) ?? 0) + 1);
+}
+const wardBreakdown = [...wardCounts.entries()]
+  .map(([wardId, count]) => ({ name: wardName(wardId), count }))
+  .sort((a, b) => b.count - a.count);
 ---
 
 <html lang={locale}>
@@ -125,6 +187,80 @@ const memberId = session?.memberId ?? null;
     <p class="ps-issue-category">{categoryLabel}</p>
     <p class="ps-issue-body">{issue.body}</p>
 
+    {
+      issue.status === "merged" && (
+        <p class="ps-merged-attribution">
+          {t["issue.merged.attribution"].replace("{count}", `${issue.supportT2Count}`)}
+          {mergedIntoSlug && (
+            <>
+              {" "}
+              <a href={`/issues/${mergedIntoSlug}`}>{t["issue.merged.viewLink"]}</a>
+            </>
+          )}
+        </p>
+      )
+    }
+
+    {
+      issue.status === "published" && (
+        <section>
+          <h2>{t["issue.detail.support.count"].replace("{count}", `${issue.supportT2Count}`)}</h2>
+
+          {wardBreakdown.length > 0 && (
+            <div>
+              <h3>{t["issue.detail.support.wardBreakdown.title"]}</h3>
+              <ul>
+                {wardBreakdown.map((entry) => (
+                  <li>
+                    {entry.name} {entry.count}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {supporterRows.length > 0 && (
+            <div>
+              <h3>{t["issue.detail.support.supporters.title"]}</h3>
+              <ul class="ps-supporter-list">
+                {supporterRows.map((row) => (
+                  <li>{row.pseudonym}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {memberId ? (
+            memberTier === "t2" ? (
+              <form id="support-form">
+                <label>
+                  {t["issue.detail.support.ward.label"]}
+                  <select name="wardId" required>
+                    {pilotWards.map((ward) => (
+                      <option value={ward.id}>
+                        {locale === "en" ? ward.nameEn : ward.nameMl}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p id="support-error" role="alert" hidden />
+                <p id="support-success" role="status" hidden>
+                  {t["issue.detail.support.success"]}
+                </p>
+                <button type="submit">{t["issue.detail.support.button"]}</button>
+              </form>
+            ) : (
+              <p>{t["issue.detail.support.tierPrompt"]}</p>
+            )
+          ) : (
+            <p>{t["issue.detail.support.loginPrompt"]}</p>
+          )}
+        </section>
+      )
+    }
+
+    {
+      issue.status === "published" && (
     <section>
       <h2>{t["issue.detail.routing.title"]}</h2>
       {
@@ -174,8 +310,54 @@ const memberId = session?.memberId ?? null;
         )
       }
     </section>
+      )
+    }
 
     <script define:vars={{ t, issueId: issue.issueId }} type="module">
+      const supportForm = document.getElementById("support-form");
+      if (supportForm) {
+        const errorEl = document.getElementById("support-error");
+        const successEl = document.getElementById("support-success");
+
+        supportForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          errorEl.hidden = true;
+          successEl.hidden = true;
+
+          const submitButton = supportForm.querySelector("button[type=submit]");
+          submitButton.disabled = true;
+          const originalLabel = submitButton.textContent;
+          submitButton.textContent = t["issue.detail.support.submitting"];
+
+          try {
+            const data = new FormData(supportForm);
+            const res = await fetch(`/api/issues/${issueId}/support`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ wardId: data.get("wardId") }),
+            });
+
+            if (res.status === 201) {
+              successEl.hidden = false;
+              submitButton.disabled = true;
+              return;
+            }
+
+            const json = await res.json().catch(() => ({}));
+            errorEl.textContent =
+              t[`issue.detail.support.error.${json.error}`] ?? t["issue.detail.support.error.generic"];
+            errorEl.hidden = false;
+            submitButton.disabled = false;
+          } catch {
+            errorEl.textContent = t["issue.detail.support.error.generic"];
+            errorEl.hidden = false;
+            submitButton.disabled = false;
+          } finally {
+            submitButton.textContent = originalLabel;
+          }
+        });
+      }
+
       const form = document.getElementById("flag-form");
       if (form) {
         const errorEl = document.getElementById("flag-error");
