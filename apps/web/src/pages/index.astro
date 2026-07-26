@@ -95,14 +95,28 @@ try {
           <p class="ps-hero__subcopy">{t["home.hero.subcopy"]}</p>
           <div class="ps-hero__ctas">
             <Button href={cta.href}>{cta.label}</Button>
+            {
+              /* #104 visual-polish triage: the mockup's secondary CTA links
+                 to a standalone "how routing works" page (web/router.dc.html)
+                 — no such generic (non-issue-specific) explainer page exists
+                 in this app yet, only the per-issue
+                 issues/[slug]/routing.astro. Building one is new page/layout
+                 work, out of #104's scope (presentation-only, no new
+                 pages) — deferring, keeping the in-page anchor. */
+            }
             <Button href="#how-it-works" variant="secondary">
               {t["home.hero.seeHowItWorks"]}
             </Button>
           </div>
           {verifiedConstituents !== null && (
-            <p class="ps-hero__stat tabular-nums">
-              {t["home.stats.verifiedConstituents"].replace("{count}", `${verifiedConstituents}`)}
-            </p>
+            <div class="ps-hero__stat-tile">
+              <span class="ps-hero__stat-number tabular-nums">
+                {new Intl.NumberFormat(locale === "en" ? "en-IN" : "ml-IN").format(
+                  verifiedConstituents,
+                )}
+              </span>
+              <span class="ps-hero__stat-label">{t["home.stats.verifiedConstituents.label"]}</span>
+            </div>
           )}
         </div>
         <div class="ps-hero__features">
@@ -243,9 +257,31 @@ try {
     gap: 1em;
     margin: 1em 0;
   }
-  .ps-hero__stat {
-    color: var(--color-navy);
-    font-weight: 600;
+  /* Mockup (web/home.dc.html:49-53): a bordered stat-tile, not a plain
+     sentence — a large serif number over a small caption label. Only ONE
+     tile is real here (verified constituents); the mockup's other two
+     ("issues acted upon", "bills transmitted") track Module F/K data that
+     doesn't exist yet, so they stay omitted rather than faked (see #89's
+     own AC on this page). */
+  .ps-hero__stat-tile {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.15em;
+    border: 1px solid var(--color-card-border);
+    border-radius: var(--radius-card);
+    background: var(--color-card-fill);
+    padding: 0.75em 1.25em;
+    margin-top: 0.25em;
+  }
+  .ps-hero__stat-number {
+    font-family: var(--font-family-heading);
+    font-weight: var(--font-weight-heading);
+    font-size: 1.7em;
+    color: var(--color-green);
+  }
+  .ps-hero__stat-label {
+    color: var(--color-muted);
+    font-size: var(--font-size-caption);
   }
   .ps-hero__features {
     display: flex;
