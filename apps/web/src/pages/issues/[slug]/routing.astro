@@ -1,0 +1,253 @@
+---
+import { getEntry } from "astro:content";
+import Button from "../../../components/Button.astro";
+import SiteChrome from "../../../components/SiteChrome.astro";
+import "../../../styles/global.css";
+import { schema } from "db";
+import { and, eq } from "drizzle-orm";
+import en from "../../../i18n/en.json";
+import ml from "../../../i18n/ml.json";
+import { getServiceRoleDb } from "../../../lib/db";
+
+// Standalone "responsibility router" explainer (issue #93 — matches
+// web/router.dc.html). Previously the routing explanation only ever
+// existed inline on issues/[slug].astro as AuthorityChip + explainer-card
+// pairs; this is a dedicated page those chips now link to, with the added
+// "who does what" Councillor/MLA/MP comparison the mockup shows. Public
+// read, same visibility rule as issues/[slug].astro.
+const locale = Astro.url.searchParams.get("lang") === "en" ? "en" : "ml";
+const t: Record<string, string> = locale === "en" ? en : ml;
+
+function notFoundResponse(): Response {
+  return new Response(
+    `<!doctype html><html lang="${locale}"><body><p>${t["issue.detail.notFound"]}</p></body></html>`,
+    { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } },
+  );
+}
+
+const slug = Astro.params.slug;
+if (!slug) {
+  return notFoundResponse();
+}
+
+const env = import.meta.env.DEV ? undefined : (await import("cloudflare:workers")).env;
+const appDatabaseUrl = import.meta.env.DEV
+  ? "postgres://app_role:app_role_dev_only@localhost:5432/prajasabha_dev"
+  : env?.APP_DATABASE_URL;
+const db = getServiceRoleDb(appDatabaseUrl as string);
+
+const [issue] = await db
+  .select({
+    issueId: schema.issues.issueId,
+    titleMl: schema.issues.titleMl,
+    titleEn: schema.issues.titleEn,
+    status: schema.issues.status,
+  })
+  .from(schema.issues)
+  .where(eq(schema.issues.slug, slug))
+  .limit(1);
+
+if (!issue || (issue.status !== "published" && issue.status !== "merged")) {
+  return notFoundResponse();
+}
+
+const title = locale === "en" ? issue.titleEn : issue.titleMl;
+
+const responsibleRows = await db
+  .select({
+    authorityKind: schema.authorities.kind,
+    authorityNameMl: schema.authorities.nameMl,
+    authorityNameEn: schema.authorities.nameEn,
+    legalBasisRef: schema.routings.legalBasisRef,
+  })
+  .from(schema.routings)
+  .innerJoin(schema.authorities, eq(schema.routings.authorityId, schema.authorities.authorityId))
+  .where(and(eq(schema.routings.issueId, issue.issueId), eq(schema.routings.role, "responsible")));
+
+const authorityNames = responsibleRows
+  .map((row) => (locale === "en" ? row.authorityNameEn : row.authorityNameMl))
+  .join(", ");
+
+// Maps the authority's DB `kind` to the mockup's 3-column civic-literacy
+// comparison (Councillor/MLA/MP). `ulb` (municipal corporation/panchayat)
+// is grouped with Councillor — both are the ward/local tier this
+// comparison is drawing the line around. `dept`/`agency` authorities
+// (specialized bodies) fall outside this 3-column model entirely — no
+// column highlights for those, rather than forcing a wrong match.
+function highlightColumn(kind: string): "councillor" | "mla" | "mp" | null {
+  if (kind === "councillor" || kind === "ulb") return "councillor";
+  if (kind === "mla") return "mla";
+  if (kind === "mp") return "mp";
+  return null;
+}
+const highlightedColumns = new Set(
+  responsibleRows.map((row) => highlightColumn(row.authorityKind)),
+);
+
+const distinctLegalBasisRefs = [
+  ...new Set(
+    responsibleRows.map((row) => row.legalBasisRef).filter((ref): ref is string => ref !== null),
+  ),
+];
+const explainerEntries = await Promise.all(
+  distinctLegalBasisRefs.map((ref) => getEntry("routingExplainers", ref)),
+);
+const explainers = explainerEntries.filter((entry) => entry !== undefined);
+
+const columns = [
+  {
+    key: "councillor" as const,
+    title: t["routing.column.councillor.title"],
+    items: [
+      t["routing.column.councillor.item1"],
+      t["routing.column.councillor.item2"],
+      t["routing.column.councillor.item3"],
+    ],
+  },
+  {
+    key: "mla" as const,
+    title: t["routing.column.mla.title"],
+    items: [
+      t["routing.column.mla.item1"],
+      t["routing.column.mla.item2"],
+      t["routing.column.mla.item3"],
+    ],
+  },
+  {
+    key: "mp" as const,
+    title: t["routing.column.mp.title"],
+    items: [
+      t["routing.column.mp.item1"],
+      t["routing.column.mp.item2"],
+      t["routing.column.mp.item3"],
+    ],
+  },
+];
+---
+
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t["routing.breadcrumb.current"]}</title>
+  </head>
+  <body>
+    <SiteChrome locale={locale}>
+      <nav class="ps-breadcrumb" aria-label="Breadcrumb">
+        <a href={`/issues/${slug}?lang=${locale}`}>{title}</a>
+        <span aria-hidden="true">/</span>
+        <span>{t["routing.breadcrumb.current"]}</span>
+      </nav>
+
+      <div class="ps-routing-page">
+        <div class="ps-card">
+          <h1>
+            {
+              responsibleRows.length > 0
+                ? t["routing.headline"].replace("{authority}", authorityNames)
+                : t["issue.detail.routing.empty"]
+            }
+          </h1>
+
+          {
+            explainers.length > 0 ? (
+              explainers.map((entry) => (
+                <div class="ps-explainer-card">
+                  <h3>{locale === "en" ? entry.data.titleEn : entry.data.titleMl}</h3>
+                  <p>{locale === "en" ? entry.data.bodyEn : entry.data.bodyMl}</p>
+                </div>
+              ))
+            ) : (
+              <p>{t["routing.legalBasis.empty"]}</p>
+            )
+          }
+        </div>
+
+        <div class="ps-card">
+          <h2>{t["routing.whoDoesWhat.title"]}</h2>
+          <div class="ps-who-does-what">
+            {
+              columns.map((column) => (
+                <div class:list={["ps-who-column", { "ps-who-column--current": highlightedColumns.has(column.key) }]}>
+                  <h3>{column.title}</h3>
+                  <ul>
+                    {column.items.map((item) => (
+                      <li>{item}</li>
+                    ))}
+                  </ul>
+                  {highlightedColumns.has(column.key) && (
+                    <p class="ps-who-column__current-label">{t["routing.currentAuthority"]}</p>
+                  )}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+
+        <div class="ps-routing-actions">
+          <Button href={`/issues/${slug}?lang=${locale}`} variant="secondary">
+            {t["routing.backToIssue"]}
+          </Button>
+          <Button href={`/dashboard?lang=${locale}`} variant="tertiary">
+            {t["routing.backToDashboard"]}
+          </Button>
+        </div>
+      </div>
+    </SiteChrome>
+  </body>
+</html>
+
+<style>
+  .ps-breadcrumb {
+    padding: 1em 1.5em 0;
+    color: var(--color-muted);
+    font-size: var(--font-size-caption);
+  }
+  .ps-breadcrumb a {
+    color: var(--color-navy);
+    text-decoration: none;
+  }
+  .ps-routing-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5em;
+    padding: 1.5em;
+  }
+  .ps-explainer-card {
+    border-left: 3px solid var(--color-navy);
+    padding: 0.5em 0.75em;
+    margin-top: 0.75em;
+  }
+  .ps-who-does-what {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1em;
+  }
+  .ps-who-column {
+    border: 1px solid var(--color-card-border);
+    border-radius: var(--radius-card);
+    padding: 1em;
+  }
+  .ps-who-column--current {
+    border-color: var(--color-navy);
+    border-width: 2px;
+  }
+  .ps-who-column h3 {
+    font-size: var(--font-size-heading);
+    margin: 0 0 0.5em;
+  }
+  .ps-who-column ul {
+    margin: 0;
+    padding-left: 1.2em;
+    color: var(--color-muted);
+  }
+  .ps-who-column__current-label {
+    color: var(--color-navy);
+    font-weight: 600;
+    margin: 0.75em 0 0;
+  }
+  .ps-routing-actions {
+    display: flex;
+    gap: 1em;
+  }
+</style>

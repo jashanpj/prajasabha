@@ -1,6 +1,6 @@
 ---
-import { getEntry } from "astro:content";
 import AuthorityChip from "../../components/AuthorityChip.astro";
+import Button from "../../components/Button.astro";
 import SiteChrome from "../../components/SiteChrome.astro";
 import "../../styles/global.css";
 import { schema } from "db";
@@ -107,16 +107,6 @@ function roleLabel(role: "responsible" | "copied"): string {
     : t["issue.routing.role.copied"];
 }
 
-const distinctLegalBasisRefs = [
-  ...new Set(
-    routingRows.map((row) => row.legalBasisRef).filter((ref): ref is string => ref !== null),
-  ),
-];
-const explainerEntries = await Promise.all(
-  distinctLegalBasisRefs.map((ref) => getEntry("routingExplainers", ref)),
-);
-const explainers = explainerEntries.filter((entry) => entry !== undefined);
-
 const title = locale === "en" ? issue.titleEn : issue.titleMl;
 const categoryLabel = t[`issue.category.${issue.category}`] ?? issue.category;
 const memberId = session?.memberId ?? null;
@@ -201,148 +191,151 @@ function timelineTimestamp(at: Date): string {
   </head>
   <body>
     <SiteChrome locale={locale}>
-      <h1>{title}</h1>
+      <nav class="ps-breadcrumb" aria-label="Breadcrumb">
+        <a href={`/dashboard?lang=${locale}`}>{t["nav.dashboard"]}</a>
+        <span aria-hidden="true">/</span>
+        <span>{title}</span>
+      </nav>
 
-    <p class="ps-issue-category">{categoryLabel}</p>
-    <p class="ps-issue-body">{issue.body}</p>
+      <div class="ps-issue-layout">
+        <div class="ps-issue-main">
+          <div class="ps-card">
+            <h1>{title}</h1>
+            <p class="ps-issue-category">{categoryLabel}</p>
+            <p class="ps-issue-body">{issue.body}</p>
 
-    {
-      issue.status === "merged" && (
-        <p class="ps-merged-attribution">
-          {t["issue.merged.attribution"].replace("{count}", `${issue.supportT2Count}`)}
-          {mergedIntoSlug && (
-            <>
-              {" "}
-              <a href={`/issues/${mergedIntoSlug}`}>{t["issue.merged.viewLink"]}</a>
-            </>
-          )}
-        </p>
-      )
-    }
-
-    <section>
-      <h2>{t["issue.timeline.title"]}</h2>
-      <ol class="ps-timeline">
-        {timelineRows.map((row) => (
-          <li>
-            <span class="ps-timeline__label">{timelineLabel(row.kind)}</span>
-            <time>{timelineTimestamp(row.at)}</time>
-          </li>
-        ))}
-      </ol>
-    </section>
-
-    {
-      issue.status === "published" && (
-        <section>
-          <h2>{t["issue.detail.support.count"].replace("{count}", `${issue.supportT2Count}`)}</h2>
-
-          {wardBreakdown.length > 0 && (
-            <div>
-              <h3>{t["issue.detail.support.wardBreakdown.title"]}</h3>
-              <ul>
-                {wardBreakdown.map((entry) => (
-                  <li>
-                    {entry.name} {entry.count}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {supporterRows.length > 0 && (
-            <div>
-              <h3>{t["issue.detail.support.supporters.title"]}</h3>
-              <ul class="ps-supporter-list">
-                {supporterRows.map((row) => (
-                  <li>{row.pseudonym}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {memberId ? (
-            memberTier === "t2" ? (
-              <form id="support-form">
-                <label>
-                  {t["issue.detail.support.ward.label"]}
-                  <select name="wardId" required>
-                    {pilotWards.map((ward) => (
-                      <option value={ward.id}>
-                        {locale === "en" ? ward.nameEn : ward.nameMl}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <p id="support-error" role="alert" hidden />
-                <p id="support-success" role="status" hidden>
-                  {t["issue.detail.support.success"]}
-                </p>
-                <button type="submit">{t["issue.detail.support.button"]}</button>
-              </form>
-            ) : (
-              <p>{t["issue.detail.support.tierPrompt"]}</p>
-            )
-          ) : (
-            <p>{t["issue.detail.support.loginPrompt"]}</p>
-          )}
-        </section>
-      )
-    }
-
-    {
-      issue.status === "published" && (
-    <section>
-      <h2>{t["issue.detail.routing.title"]}</h2>
-      {
-        routingRows.length === 0 ? (
-          <p>{t["issue.detail.routing.empty"]}</p>
-        ) : (
-          <ul class="ps-routing-list">
-            {routingRows.map((row) => (
-              <li>
-                <AuthorityChip
-                  role={row.role}
-                  authorityName={authorityName(row)}
-                  roleLabel={roleLabel(row.role)}
-                />
-              </li>
-            ))}
-          </ul>
-        )
-      }
-
-      {
-        explainers.map((entry) => (
-          <div class="ps-explainer-card">
-            <h3>{locale === "en" ? entry.data.titleEn : entry.data.titleMl}</h3>
-            <p>{locale === "en" ? entry.data.bodyEn : entry.data.bodyMl}</p>
+            {issue.status === "merged" && (
+              <p class="ps-merged-attribution">
+                {t["issue.merged.attribution"].replace("{count}", `${issue.supportT2Count}`)}
+                {mergedIntoSlug && (
+                  <>
+                    {" "}
+                    <a href={`/issues/${mergedIntoSlug}`}>{t["issue.merged.viewLink"]}</a>
+                  </>
+                )}
+              </p>
+            )}
           </div>
-        ))
-      }
-    </section>
 
-    <section>
-      {
-        memberId ? (
-          <form id="flag-form">
-            <label>
-              {t["issue.detail.flag.note.label"]}
-              <textarea name="note" maxlength="500" rows="3" />
-            </label>
-            <p id="flag-error" role="alert" hidden />
-            <p id="flag-success" role="status" hidden>
-              {t["issue.detail.flag.success"]}
-            </p>
-            <button type="submit">{t["issue.detail.flag.button"]}</button>
-          </form>
-        ) : (
-          <p>{t["issue.detail.flag.loginPrompt"]}</p>
-        )
-      }
-    </section>
-      )
-    }
+          {issue.status === "published" && (
+            <div class="ps-card">
+              <h2>{t["issue.detail.routing.title"]}</h2>
+              {routingRows.length === 0 ? (
+                <p>{t["issue.detail.routing.empty"]}</p>
+              ) : (
+                <>
+                  <ul class="ps-routing-list">
+                    {routingRows.map((row) => (
+                      <li>
+                        <AuthorityChip
+                          role={row.role}
+                          authorityName={authorityName(row)}
+                          roleLabel={roleLabel(row.role)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                  <a href={`/issues/${slug}/routing?lang=${locale}`} class="ps-routing-explainer-link">
+                    {t["issue.detail.routing.whyLink"]}
+                  </a>
+                </>
+              )}
+            </div>
+          )}
+
+          {issue.status === "published" && (
+            <div class="ps-card">
+              {memberId ? (
+                <form id="flag-form" class="ps-form">
+                  <label>
+                    {t["issue.detail.flag.note.label"]}
+                    <textarea name="note" maxlength="500" rows="3" />
+                  </label>
+                  <p id="flag-error" class="ps-form-error" role="alert" hidden />
+                  <p id="flag-success" role="status" hidden>
+                    {t["issue.detail.flag.success"]}
+                  </p>
+                  <Button type="submit">{t["issue.detail.flag.button"]}</Button>
+                </form>
+              ) : (
+                <p>{t["issue.detail.flag.loginPrompt"]}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div class="ps-issue-sidebar">
+          {issue.status === "published" && (
+            <div class="ps-card">
+              <h2 class="tabular-nums">
+                {t["issue.detail.support.count"].replace("{count}", `${issue.supportT2Count}`)}
+              </h2>
+
+              {wardBreakdown.length > 0 && (
+                <div>
+                  <h3>{t["issue.detail.support.wardBreakdown.title"]}</h3>
+                  <ul>
+                    {wardBreakdown.map((entry) => (
+                      <li>
+                        {entry.name} {entry.count}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {supporterRows.length > 0 && (
+                <div>
+                  <h3>{t["issue.detail.support.supporters.title"]}</h3>
+                  <ul class="ps-supporter-list">
+                    {supporterRows.map((row) => (
+                      <li>{row.pseudonym}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {memberId ? (
+                memberTier === "t2" ? (
+                  <form id="support-form" class="ps-form">
+                    <label>
+                      {t["issue.detail.support.ward.label"]}
+                      <select name="wardId" required>
+                        {pilotWards.map((ward) => (
+                          <option value={ward.id}>
+                            {locale === "en" ? ward.nameEn : ward.nameMl}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p id="support-error" class="ps-form-error" role="alert" hidden />
+                    <p id="support-success" role="status" hidden>
+                      {t["issue.detail.support.success"]}
+                    </p>
+                    <Button type="submit">{t["issue.detail.support.button"]}</Button>
+                  </form>
+                ) : (
+                  <p>{t["issue.detail.support.tierPrompt"]}</p>
+                )
+              ) : (
+                <p>{t["issue.detail.support.loginPrompt"]}</p>
+              )}
+            </div>
+          )}
+
+          <div class="ps-card">
+            <h2>{t["issue.timeline.title"]}</h2>
+            <ol class="ps-timeline">
+              {timelineRows.map((row) => (
+                <li>
+                  <span class="ps-timeline__label">{timelineLabel(row.kind)}</span>
+                  <time>{timelineTimestamp(row.at)}</time>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </div>
 
     <script define:vars={{ t, issueId: issue.issueId }} type="module">
       const supportForm = document.getElementById("support-form");
@@ -433,17 +426,40 @@ function timelineTimestamp(at: Date): string {
     </script>
 
     <style>
+      .ps-breadcrumb {
+        padding: 1em 1.5em 0;
+        color: var(--color-muted);
+        font-size: var(--font-size-caption);
+      }
+      .ps-breadcrumb a {
+        color: var(--color-navy);
+        text-decoration: none;
+      }
+      .ps-issue-layout {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5em;
+        padding: 1.5em;
+        align-items: start;
+      }
+      .ps-issue-main,
+      .ps-issue-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5em;
+      }
       .ps-routing-list {
         list-style: none;
         display: flex;
         flex-wrap: wrap;
         gap: 0.5em;
         padding: 0;
+        margin: 0 0 0.75em;
       }
-      .ps-explainer-card {
-        border-left: 3px solid var(--color-navy);
-        padding: 0.5em 0.75em;
-        margin-top: 0.75em;
+      .ps-routing-explainer-link {
+        color: var(--color-navy);
+        font-weight: 600;
+        text-decoration: none;
       }
       .ps-timeline {
         padding-left: 1.2em;
