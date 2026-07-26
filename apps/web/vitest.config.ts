@@ -17,5 +17,13 @@ export default defineConfig({
     // Applies packages/db's + packages/vault-db's migrations once before
     // any test runs — see src/test/global-setup.ts.
     globalSetup: "./src/test/global-setup.ts",
+    // Every endpoint test file opens its own Postgres connection pool
+    // (getServiceRoleDb). Running test files in parallel (Vitest's
+    // default) exhausts the CI Postgres container's connection limit —
+    // "remaining connection slots are reserved for roles with the
+    // SUPERUSER attribute" — which has been silently breaking master's CI
+    // since PR #81 (issue #24). Serial file execution is slower but
+    // deterministic; correctness here matters more than a few seconds.
+    fileParallelism: false,
   },
 });
