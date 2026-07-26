@@ -236,10 +236,56 @@ function timelineTimestamp(at: Date): string {
             )}
           </div>
 
-          {deliberation && (
+          {deliberation && (deliberation.state === "closed" || deliberation.state === "summarized") && (
             <div class="ps-card">
               <h2>{t["issue.detail.deliberation.title"]}</h2>
               <p>{deliberationStateLabel(deliberation.state, deliberation.closesAt)}</p>
+            </div>
+          )}
+
+          {deliberation && (deliberation.state === "open" || deliberation.state === "extended") && (
+            <div class="ps-card">
+              <h2>{t["issue.detail.deliberation.title"]}</h2>
+              <p class="ps-deliberation-subtitle">{t["issue.detail.deliberation.subtitle"]}</p>
+
+              {memberId && memberTier === "t2" ? (
+                <>
+                  <div id="deliberation-statement-card" class="ps-statement-card" hidden>
+                    <blockquote id="deliberation-statement-body" class="ps-statement-quote"></blockquote>
+                    <div class="ps-vote-buttons">
+                      <button type="button" class="ps-vote-btn ps-vote-btn--agree" data-vote="agree">
+                        {t["issue.detail.deliberation.vote.agree"]}
+                      </button>
+                      <button type="button" class="ps-vote-btn ps-vote-btn--disagree" data-vote="disagree">
+                        {t["issue.detail.deliberation.vote.disagree"]}
+                      </button>
+                      <button type="button" class="ps-vote-btn ps-vote-btn--pass" data-vote="pass">
+                        {t["issue.detail.deliberation.vote.pass"]}
+                      </button>
+                    </div>
+                    <p id="deliberation-vote-error" class="ps-form-error" role="alert" hidden />
+                  </div>
+                  <p id="deliberation-empty" hidden>{t["issue.detail.deliberation.noneLeft"]}</p>
+                  <p id="deliberation-position" class="ps-deliberation-position tabular-nums"></p>
+
+                  <form id="statement-form" class="ps-form">
+                    <label>
+                      {t["issue.detail.deliberation.submit.label"]}
+                      <textarea name="body" maxlength="280" rows="3" required></textarea>
+                    </label>
+                    <p id="statement-char-count" class="ps-char-count tabular-nums">0 / 280</p>
+                    <p id="statement-error" class="ps-form-error" role="alert" hidden />
+                    <p id="statement-success" role="status" hidden>
+                      {t["issue.detail.deliberation.submit.success"]}
+                    </p>
+                    <Button type="submit">{t["issue.detail.deliberation.submit.button"]}</Button>
+                  </form>
+                </>
+              ) : memberId ? (
+                <p>{t["issue.detail.deliberation.tierPrompt"]}</p>
+              ) : (
+                <p>{t["issue.detail.deliberation.loginPrompt"]}</p>
+              )}
             </div>
           )}
 
@@ -363,7 +409,10 @@ function timelineTimestamp(at: Date): string {
         </div>
       </div>
 
-    <script define:vars={{ t, issueId: issue.issueId }} type="module">
+    <script
+      define:vars={{ t, issueId: issue.issueId, deliberationId: deliberation?.deliberationId ?? null }}
+      type="module"
+    >
       const supportForm = document.getElementById("support-form");
       if (supportForm) {
         const errorEl = document.getElementById("support-error");
@@ -404,6 +453,114 @@ function timelineTimestamp(at: Date): string {
             submitButton.disabled = false;
           } finally {
             submitButton.textContent = originalLabel;
+          }
+        });
+      }
+
+      // C1 — Statement Submission & Voting (issue #33). Vanilla JS, no
+      // `client:` directive, matching the existing support/flag-form
+      // convention. Only rendered for a signed-in T2 member (server-gated
+      // above), so `deliberation-statement-card` only exists in the DOM
+      // when there's a real deliberationId to call.
+      const statementCard = document.getElementById("deliberation-statement-card");
+      if (statementCard && deliberationId) {
+        const bodyEl = document.getElementById("deliberation-statement-body");
+        const positionEl = document.getElementById("deliberation-position");
+        const emptyEl = document.getElementById("deliberation-empty");
+        const voteErrorEl = document.getElementById("deliberation-vote-error");
+        let currentStatementId = null;
+
+        async function loadNextStatement() {
+          voteErrorEl.hidden = true;
+          const res = await fetch(`/api/deliberations/${deliberationId}/statements/next`);
+          if (!res.ok) return;
+          const json = await res.json();
+
+          positionEl.textContent = t["issue.detail.deliberation.position"]
+            .replace("{position}", json.position)
+            .replace("{total}", json.total);
+
+          if (json.done) {
+            statementCard.hidden = true;
+            emptyEl.hidden = false;
+            currentStatementId = null;
+            return;
+          }
+          emptyEl.hidden = true;
+          statementCard.hidden = false;
+          bodyEl.textContent = json.statement.body;
+          currentStatementId = json.statement.statementId;
+        }
+
+        for (const button of statementCard.querySelectorAll(".ps-vote-btn")) {
+          button.addEventListener("click", async () => {
+            if (!currentStatementId) return;
+            voteErrorEl.hidden = true;
+
+            const res = await fetch(`/api/statements/${currentStatementId}/vote`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ vote: button.dataset.vote }),
+            });
+
+            if (res.status === 201) {
+              await loadNextStatement();
+              return;
+            }
+            const json = await res.json().catch(() => ({}));
+            voteErrorEl.textContent =
+              t[`issue.detail.deliberation.vote.error.${json.error}`] ??
+              t["issue.detail.deliberation.vote.error.generic"];
+            voteErrorEl.hidden = false;
+          });
+        }
+
+        loadNextStatement();
+      }
+
+      const statementForm = document.getElementById("statement-form");
+      if (statementForm && deliberationId) {
+        const textarea = statementForm.querySelector("textarea[name=body]");
+        const charCount = document.getElementById("statement-char-count");
+        const errorEl = document.getElementById("statement-error");
+        const successEl = document.getElementById("statement-success");
+
+        textarea.addEventListener("input", () => {
+          charCount.textContent = `${textarea.value.length} / 280`;
+        });
+
+        statementForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          errorEl.hidden = true;
+          successEl.hidden = true;
+
+          const submitButton = statementForm.querySelector("button[type=submit]");
+          submitButton.disabled = true;
+
+          try {
+            const res = await fetch(`/api/deliberations/${deliberationId}/statements`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ body: textarea.value }),
+            });
+
+            if (res.status === 201) {
+              successEl.hidden = false;
+              statementForm.reset();
+              charCount.textContent = "0 / 280";
+              return;
+            }
+
+            const json = await res.json().catch(() => ({}));
+            errorEl.textContent =
+              t[`issue.detail.deliberation.submit.error.${json.error}`] ??
+              t["issue.detail.deliberation.submit.error.generic"];
+            errorEl.hidden = false;
+          } catch {
+            errorEl.textContent = t["issue.detail.deliberation.submit.error.generic"];
+            errorEl.hidden = false;
+          } finally {
+            submitButton.disabled = false;
           }
         });
       }
@@ -498,6 +655,61 @@ function timelineTimestamp(at: Date): string {
         margin-right: 0.5em;
       }
       .ps-timeline time {
+        color: var(--color-muted);
+        font-size: var(--font-size-caption);
+      }
+      .ps-deliberation-subtitle {
+        color: var(--color-muted);
+        font-size: var(--font-size-caption);
+        margin-top: -0.5em;
+      }
+      .ps-statement-card {
+        background: #fff;
+        border: 1px solid var(--color-card-border);
+        border-radius: var(--radius-card);
+        padding: 1.5em 1.75em;
+        display: flex;
+        flex-direction: column;
+        gap: 1.1em;
+        margin-top: 0.5em;
+      }
+      .ps-statement-quote {
+        font-family: var(--font-family-heading);
+        font-size: 1.25em;
+        line-height: 1.45;
+        margin: 0;
+      }
+      .ps-vote-buttons {
+        display: flex;
+        gap: 0.6em;
+      }
+      .ps-vote-btn {
+        flex: 1;
+        text-align: center;
+        font-size: 0.9em;
+        font-weight: 600;
+        padding: 0.7em;
+        border-radius: var(--radius-button);
+        background: transparent;
+        cursor: pointer;
+      }
+      .ps-vote-btn--agree {
+        border: 1.5px solid var(--color-green);
+        color: var(--status-acted-upon-text);
+      }
+      .ps-vote-btn--disagree {
+        border: 1.5px solid #b25c13;
+        color: var(--status-acknowledged-text);
+      }
+      .ps-vote-btn--pass {
+        border: 1.5px solid var(--color-disabled);
+        color: var(--status-no-response-text);
+      }
+      .ps-deliberation-position {
+        color: var(--color-muted);
+        font-size: var(--font-size-caption);
+      }
+      .ps-char-count {
         color: var(--color-muted);
         font-size: var(--font-size-caption);
       }

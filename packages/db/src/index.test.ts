@@ -21,6 +21,11 @@ describe("packages/db entrypoint", () => {
         "routingRoleEnum",
         "routingRules",
         "routings",
+        // Issue #33 — C1 Statement Submission & Voting.
+        "statementStatusEnum",
+        "statementVoteEnum",
+        "statementVotes",
+        "statements",
       ].sort(),
     );
   });

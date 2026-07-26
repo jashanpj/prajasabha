@@ -88,5 +88,10 @@ declare namespace Cloudflare {
     // deliberation state from this app.
     JOBS_SVC: Fetcher;
     JOBS_INTERNAL_TOKEN: string;
+    // Issue #33 — C1 Statement Submission & Voting.
+    STATEMENT_SUBMIT_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
+    STATEMENT_VOTE_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
+    STATEMENT_MODERATION_ADMIN_TOKEN: string;
+    STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST: string;
   }
 }

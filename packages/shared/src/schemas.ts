@@ -82,3 +82,30 @@ export const issueSupportActionSchema = z.object({
   memberId: z.string().uuid(),
 });
 export type IssueSupportAction = z.infer<typeof issueSupportActionSchema>;
+
+// C1: statement submission (issue #33). "<=280 chars" is the story's own
+// literal text — a fixed content-shape constant (same category as B1's
+// 5-photo cap), not a tunable product threshold, so it's a plain literal
+// here rather than config-driven, and not a DB CHECK either (same "bakes a
+// product threshold into the schema" reasoning as photoKeys' cap).
+export const statementCreateSchema = z.object({
+  body: z.string().min(1).max(280),
+});
+export type StatementCreate = z.infer<typeof statementCreateSchema>;
+
+// C1: Agree/Disagree/Pass vote on a statement.
+export const statementVoteActionSchema = z.object({
+  vote: z.enum(["agree", "disagree", "pass"]),
+});
+export type StatementVoteAction = z.infer<typeof statementVoteActionSchema>;
+
+// C1: minimal admin-gated moderation action (mirrors #26's merge endpoint
+// pattern — Module H's real moderation console, issue #29, doesn't exist
+// yet). `ruleCited`/`publicNote` map directly onto the existing
+// moderationActions table's own columns.
+export const statementModerationActionSchema = z.object({
+  action: z.enum(["approve", "reject"]),
+  ruleCited: z.string().min(1),
+  publicNote: z.string().max(500).optional(),
+});
+export type StatementModerationAction = z.infer<typeof statementModerationActionSchema>;

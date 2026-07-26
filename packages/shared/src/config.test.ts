@@ -18,6 +18,9 @@ import {
   loadPilotWardsConfig,
   loadRateLimitConfig,
   loadReviewQueueConfig,
+  loadStatementModerationAdminConfig,
+  loadStatementSubmitRateLimitConfig,
+  loadStatementVoteRateLimitConfig,
 } from "./config";
 
 const VALID_CORE_ENV = {
@@ -658,6 +661,91 @@ describe("loadDeliberationSweepAdminConfig (demo tooling — issue #35)", () => 
       loadDeliberationSweepAdminConfig({
         DELIBERATION_SWEEP_ADMIN_TOKEN: "",
         DELIBERATION_SWEEP_ADMIN_IP_ALLOWLIST: "203.0.113.10",
+      }),
+    ).toThrow();
+  });
+});
+
+// Issue #33 — C1 Statement Submission & Voting.
+
+describe("loadStatementSubmitRateLimitConfig (C1 — issue #33)", () => {
+  it("resolves the per-member rate limit from env", () => {
+    expect(
+      loadStatementSubmitRateLimitConfig({ STATEMENT_SUBMIT_RATE_LIMIT_PER_MEMBER_PER_HOUR: "20" }),
+    ).toEqual({ statementSubmitRateLimitPerMemberPerHour: 20 });
+  });
+
+  it("throws when env is empty", () => {
+    expect(() => loadStatementSubmitRateLimitConfig({})).toThrow(
+      /STATEMENT_SUBMIT_RATE_LIMIT_PER_MEMBER_PER_HOUR/,
+    );
+  });
+
+  it("rejects a non-positive rate limit", () => {
+    expect(() =>
+      loadStatementSubmitRateLimitConfig({ STATEMENT_SUBMIT_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
+    ).toThrow();
+  });
+});
+
+describe("loadStatementVoteRateLimitConfig (C1 — issue #33)", () => {
+  it("resolves the per-member rate limit from env", () => {
+    expect(
+      loadStatementVoteRateLimitConfig({ STATEMENT_VOTE_RATE_LIMIT_PER_MEMBER_PER_HOUR: "100" }),
+    ).toEqual({ statementVoteRateLimitPerMemberPerHour: 100 });
+  });
+
+  it("throws when env is empty", () => {
+    expect(() => loadStatementVoteRateLimitConfig({})).toThrow(
+      /STATEMENT_VOTE_RATE_LIMIT_PER_MEMBER_PER_HOUR/,
+    );
+  });
+
+  it("rejects a non-positive rate limit", () => {
+    expect(() =>
+      loadStatementVoteRateLimitConfig({ STATEMENT_VOTE_RATE_LIMIT_PER_MEMBER_PER_HOUR: "0" }),
+    ).toThrow();
+  });
+});
+
+describe("loadStatementModerationAdminConfig (C1 — issue #33)", () => {
+  it("resolves the admin token and a comma-separated IP allowlist from env", () => {
+    expect(
+      loadStatementModerationAdminConfig({
+        STATEMENT_MODERATION_ADMIN_TOKEN: "moderation-admin-token",
+        STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST: "203.0.113.10,203.0.113.11",
+      }),
+    ).toEqual({
+      adminToken: "moderation-admin-token",
+      ipAllowlist: ["203.0.113.10", "203.0.113.11"],
+    });
+  });
+
+  it("throws when env is empty (no silent fallback — CLAUDE.md invariant 6)", () => {
+    expect(() => loadStatementModerationAdminConfig({})).toThrow(/Missing required config env var/);
+  });
+
+  it("throws naming the missing admin token var", () => {
+    expect(() =>
+      loadStatementModerationAdminConfig({
+        STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST: "203.0.113.10",
+      }),
+    ).toThrow(/STATEMENT_MODERATION_ADMIN_TOKEN/);
+  });
+
+  it("throws naming the missing IP allowlist var", () => {
+    expect(() =>
+      loadStatementModerationAdminConfig({
+        STATEMENT_MODERATION_ADMIN_TOKEN: "moderation-admin-token",
+      }),
+    ).toThrow(/STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST/);
+  });
+
+  it("rejects an empty admin token", () => {
+    expect(() =>
+      loadStatementModerationAdminConfig({
+        STATEMENT_MODERATION_ADMIN_TOKEN: "",
+        STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST: "203.0.113.10",
       }),
     ).toThrow();
   });
