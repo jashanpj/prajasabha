@@ -83,6 +83,16 @@ export async function handleCreate(request: Request, env: Cloudflare.Env): Promi
     return Response.json({ error: "create_failed" }, { status: 500 });
   }
 
+  // B5 — Issue Timeline (issue #28). The first entry a timeline can ever
+  // show — fired at draft creation, not publish, so "created" is the true
+  // start of the record even though the issue isn't publicly visible yet.
+  await db.insert(schema.eventLog).values({
+    actorMemberId: session.memberId,
+    kind: "issue_created",
+    subjectType: "issue",
+    subjectId: inserted.issueId,
+  });
+
   return Response.json({ issueId: inserted.issueId }, { status: 201 });
 }
 

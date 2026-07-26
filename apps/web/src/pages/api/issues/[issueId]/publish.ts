@@ -135,6 +135,14 @@ export async function handlePublish(
     );
   }
 
+  // B5 — Issue Timeline (issue #28).
+  await db.insert(schema.eventLog).values({
+    actorMemberId: session.memberId,
+    kind: "issue_published",
+    subjectType: "issue",
+    subjectId: issueId,
+  });
+
   return Response.json({ slug });
 }
 

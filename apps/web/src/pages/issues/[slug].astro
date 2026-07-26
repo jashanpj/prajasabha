@@ -5,7 +5,7 @@ import Logo from "../../components/Logo.astro";
 import TricolourHairline from "../../components/TricolourHairline.astro";
 import "../../styles/global.css";
 import { schema } from "db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { verifySession } from "shared";
 import en from "../../i18n/en.json";
 import ml from "../../i18n/ml.json";
@@ -169,6 +169,29 @@ for (const row of supporterRows) {
 const wardBreakdown = [...wardCounts.entries()]
   .map(([wardId, count]) => ({ name: wardName(wardId), count }))
   .sort((a, b) => b.count - a.count);
+
+// B5 — Issue Timeline (issue #28). Generated purely from the append-only
+// event_log — no separate mutable "timeline" table (invariant 3: no
+// UPDATE/DELETE is even possible on these rows). Only a localized label
+// per `kind` + timestamp is rendered, never the raw `payload` — a
+// deliberate safety default, since e.g. `issue_routing_flagged`'s payload
+// carries a free-text member-submitted note that must never be public.
+const timelineRows = await db
+  .select({ kind: schema.eventLog.kind, at: schema.eventLog.at })
+  .from(schema.eventLog)
+  .where(
+    and(eq(schema.eventLog.subjectType, "issue"), eq(schema.eventLog.subjectId, issue.issueId)),
+  )
+  .orderBy(schema.eventLog.at);
+function timelineLabel(kind: string): string {
+  return t[`issue.timeline.kind.${kind}`] ?? kind;
+}
+function timelineTimestamp(at: Date): string {
+  return at.toLocaleString(locale === "en" ? "en-IN" : "ml-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 ---
 
 <html lang={locale}>
@@ -200,6 +223,18 @@ const wardBreakdown = [...wardCounts.entries()]
         </p>
       )
     }
+
+    <section>
+      <h2>{t["issue.timeline.title"]}</h2>
+      <ol class="ps-timeline">
+        {timelineRows.map((row) => (
+          <li>
+            <span class="ps-timeline__label">{timelineLabel(row.kind)}</span>
+            <time>{timelineTimestamp(row.at)}</time>
+          </li>
+        ))}
+      </ol>
+    </section>
 
     {
       issue.status === "published" && (
@@ -413,6 +448,20 @@ const wardBreakdown = [...wardCounts.entries()]
         border-left: 3px solid var(--color-navy);
         padding: 0.5em 0.75em;
         margin-top: 0.75em;
+      }
+      .ps-timeline {
+        padding-left: 1.2em;
+      }
+      .ps-timeline li {
+        margin-bottom: 0.4em;
+      }
+      .ps-timeline__label {
+        font-weight: 600;
+        margin-right: 0.5em;
+      }
+      .ps-timeline time {
+        color: var(--color-muted);
+        font-size: var(--font-size-caption);
       }
     </style>
   </body>

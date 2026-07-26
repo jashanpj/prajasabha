@@ -56,3 +56,42 @@ describe.each(["event_log", "moderation_actions"] as const)("%s (append-only)", 
     });
   });
 });
+
+// Issue #28 (B5 — Issue Timeline). The timeline is rendered purely from
+// event_log rows — this test is anchored directly to #28's own test note:
+// "attempting to edit a timeline entry directly (bypassing event_log) must
+// fail". It inserts a row shaped like a real timeline entry (issue_created)
+// and proves that Postgres itself — not just app code — rejects both
+// UPDATE and DELETE on that specific row.
+describe("event_log (issue timeline entries are append-only)", () => {
+  it("a real timeline-entry-shaped row (kind: issue_created) cannot be UPDATEd or DELETEd", async () => {
+    const subjectId = randomUUID();
+    const marker = `timeline-${randomUUID().slice(0, 8)}`;
+
+    await withRole(databaseUrl, "service_role", async (client) => {
+      await client.query(
+        "INSERT INTO event_log (kind, subject_type, subject_id, payload) VALUES ($1, 'issue', $2, $3)",
+        [marker, subjectId, JSON.stringify({})],
+      );
+      const inserted = await client.query("SELECT * FROM event_log WHERE kind = $1", [marker]);
+      expect(inserted.rows).toHaveLength(1);
+
+      await expect(
+        client.query("UPDATE event_log SET payload = $1 WHERE kind = $2", [
+          JSON.stringify({ tampered: true }),
+          marker,
+        ]),
+      ).rejects.toThrow(/permission denied/);
+
+      await expect(client.query("DELETE FROM event_log WHERE kind = $1", [marker])).rejects.toThrow(
+        /permission denied/,
+      );
+
+      // Still there, untouched — direct edit/delete of a timeline entry
+      // must fail, full stop.
+      const after = await client.query("SELECT * FROM event_log WHERE kind = $1", [marker]);
+      expect(after.rows).toHaveLength(1);
+      expect(after.rows[0].payload).toEqual({});
+    });
+  });
+});

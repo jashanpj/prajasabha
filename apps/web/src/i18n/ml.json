@@ -104,5 +104,11 @@
   "issue.detail.support.error.rate_limited": "ഈ പ്രവർത്തനത്തിനുള്ള മണിക്കൂർ പരിധി കഴിഞ്ഞു. അൽപ്പസമയം കഴിഞ്ഞ് വീണ്ടും ശ്രമിക്കുക.",
   "issue.detail.support.error.generic": "എന്തോ പിഴവ് സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക.",
   "issue.merged.attribution": "{count} നിവാസികൾ ഉന്നയിച്ചത്, മറ്റൊരു പ്രശ്നത്തിലേക്ക് ലയിപ്പിച്ചു.",
-  "issue.merged.viewLink": "സജീവമായ പ്രശ്നം കാണുക"
+  "issue.merged.viewLink": "സജീവമായ പ്രശ്നം കാണുക",
+  "issue.timeline.title": "സമയരേഖ",
+  "issue.timeline.kind.issue_created": "പ്രശ്നം സൃഷ്ടിച്ചു",
+  "issue.timeline.kind.issue_published": "പ്രസിദ്ധീകരിച്ചു",
+  "issue.timeline.kind.issue_promoted_to_concern": "കോൺസ്റ്റിറ്റ്യുവൻസി കൺസേണിലേക്ക് ഉയർത്തി",
+  "issue.timeline.kind.issue_merged": "മറ്റൊരു പ്രശ്നത്തിലേക്ക് ലയിപ്പിച്ചു",
+  "issue.timeline.kind.issue_routing_flagged": "റൂട്ടിംഗ് അവലോകനത്തിനായി ഫ്ലാഗ് ചെയ്തു"
 }
