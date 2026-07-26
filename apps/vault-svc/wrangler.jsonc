@@ -10,8 +10,19 @@
   // deploy-readiness follow-up, out of scope for this issue. Local dev
   // (docker-compose) and CI (Vitest, running in Node) are unaffected.
   "compatibility_flags": ["nodejs_compat"],
+  // Issue #22 — rate-limits /public/epic/submit, the one endpoint on this
+  // Worker reachable with no service-to-service auth token (Turnstile
+  // only, same posture as apps/web's register/start.ts). Needs a real KV
+  // namespace id per environment before deploying, same as apps/web's own
+  // RATE_LIMIT_KV.
+  "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "local-dev-placeholder" }],
   "dev": {
     "port": 8789,
     "inspector_port": 19231
   }
+  // Secrets (never committed): VAULT_SVC_DATABASE_URL, EMAIL_ENCRYPTION_KEY,
+  // EMAIL_HASH_PEPPER, VAULT_SVC_INTERNAL_TOKEN, MAGIC_LINK_TTL_MINUTES,
+  // EPIC_HASH_PEPPER, EPIC_ENCRYPTION_KEY, EPIC_DOC_ENCRYPTION_KEY,
+  // TURNSTILE_SECRET_KEY, REVIEW_QUEUE_TOKEN, REVIEW_QUEUE_IP_ALLOWLIST,
+  // EPIC_SUBMIT_RATE_LIMIT_PER_IP_PER_HOUR (issue #16/#22) — see .env.example.
 }

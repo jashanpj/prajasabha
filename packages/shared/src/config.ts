@@ -88,3 +88,115 @@ export function loadRateLimitConfig(env: Record<string, string | undefined>): Ra
     verifyRateLimitPerIpPerHour: env.VERIFY_RATE_LIMIT_PER_IP_PER_HOUR,
   });
 }
+
+// Issue #22 — A3 T2 verification (EPIC / Voter ID → constituency mapping).
+// `/public/epic/submit` (apps/vault-svc) is reachable with no
+// service-to-service auth at all (only Turnstile, same as
+// register/start.ts) and apps/web's own /api/verify/epic/submit is the
+// one call that can reveal "already verified by someone else" — both need
+// the same KV-backed rate-limit treatment start.ts already gets. Two
+// separate loaders, not one combined blob (same reasoning as
+// loadMagicLinkConfig/loadRateLimitConfig above): each is needed by a
+// different service, and bundling them would force apps/web to also
+// declare vault-svc's own rate-limit var it never reads, or vice versa.
+
+const EPIC_SUBMIT_RATE_LIMIT_REQUIRED_VARS = ["EPIC_SUBMIT_RATE_LIMIT_PER_IP_PER_HOUR"] as const;
+
+const EpicSubmitRateLimitConfigSchema = z.object({
+  epicSubmitRateLimitPerIpPerHour: z.coerce.number().int().positive(),
+});
+
+export type EpicSubmitRateLimitConfig = z.infer<typeof EpicSubmitRateLimitConfigSchema>;
+
+/** apps/vault-svc's /public/epic/submit per-IP rate limit. */
+export function loadEpicSubmitRateLimitConfig(
+  env: Record<string, string | undefined>,
+): EpicSubmitRateLimitConfig {
+  const missing = EPIC_SUBMIT_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return EpicSubmitRateLimitConfigSchema.parse({
+    epicSubmitRateLimitPerIpPerHour: env.EPIC_SUBMIT_RATE_LIMIT_PER_IP_PER_HOUR,
+  });
+}
+
+const EPIC_LINK_RATE_LIMIT_REQUIRED_VARS = ["EPIC_LINK_RATE_LIMIT_PER_MEMBER_PER_HOUR"] as const;
+
+const EpicLinkRateLimitConfigSchema = z.object({
+  epicLinkRateLimitPerMemberPerHour: z.coerce.number().int().positive(),
+});
+
+export type EpicLinkRateLimitConfig = z.infer<typeof EpicLinkRateLimitConfigSchema>;
+
+/** apps/web's /api/verify/epic/submit per-member rate limit. */
+export function loadEpicLinkRateLimitConfig(
+  env: Record<string, string | undefined>,
+): EpicLinkRateLimitConfig {
+  const missing = EPIC_LINK_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return EpicLinkRateLimitConfigSchema.parse({
+    epicLinkRateLimitPerMemberPerHour: env.EPIC_LINK_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  });
+}
+
+// Two more loaders, same "no silent fallback" posture as the three above.
+
+const commaSeparatedList = z
+  .string()
+  .transform((value) => value.split(",").map((entry) => entry.trim()));
+
+const REVIEW_QUEUE_REQUIRED_VARS = ["REVIEW_QUEUE_IP_ALLOWLIST"] as const;
+
+const ReviewQueueConfigSchema = z.object({
+  ipAllowlist: commaSeparatedList,
+});
+
+export type ReviewQueueConfig = z.infer<typeof ReviewQueueConfigSchema>;
+
+/**
+ * apps/vault-svc's /review/epic/* IP allowlist — used by requireReviewAccess
+ * (review-auth.ts) to gate the review queue, which is deliberately a
+ * separate auth path from VAULT_SVC_INTERNAL_TOKEN (see #22's test notes).
+ */
+export function loadReviewQueueConfig(env: Record<string, string | undefined>): ReviewQueueConfig {
+  const missing = REVIEW_QUEUE_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return ReviewQueueConfigSchema.parse({ ipAllowlist: env.REVIEW_QUEUE_IP_ALLOWLIST });
+}
+
+const EPIC_VERIFICATION_REQUIRED_VARS = [
+  "PILOT_CONSTITUENCY_NAME_ML",
+  "PILOT_CONSTITUENCY_NAME_EN",
+  "COVERED_ASSEMBLY_SEGMENTS",
+] as const;
+
+const EpicVerificationConfigSchema = z.object({
+  pilotConstituencyNameMl: z.string().min(1),
+  pilotConstituencyNameEn: z.string().min(1),
+  coveredAssemblySegments: commaSeparatedList,
+});
+
+export type EpicVerificationConfig = z.infer<typeof EpicVerificationConfigSchema>;
+
+/**
+ * The pilot's single Lok Sabha constituency display name (ml/en) plus the
+ * allow-list of assembly segments already onboarded — used by apps/web's
+ * verify/epic/status endpoint to decide the "T2 badge shows constituency
+ * name" vs. "mismatched constituency... coming soon" AC. No constituencies
+ * table exists (the whole pilot targets one constituency); this is
+ * deliberately config, not schema, same pattern as concernThresholdT2.
+ */
+export function loadEpicVerificationConfig(
+  env: Record<string, string | undefined>,
+): EpicVerificationConfig {
+  const missing = EPIC_VERIFICATION_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return EpicVerificationConfigSchema.parse({
+    pilotConstituencyNameMl: env.PILOT_CONSTITUENCY_NAME_ML,
+    pilotConstituencyNameEn: env.PILOT_CONSTITUENCY_NAME_EN,
+    coveredAssemblySegments: env.COVERED_ASSEMBLY_SEGMENTS,
+  });
+}

@@ -37,5 +37,17 @@ declare namespace Cloudflare {
     REGISTER_RATE_LIMIT_PER_EMAIL_PER_HOUR: string;
     REGISTER_RATE_LIMIT_PER_IP_PER_HOUR: string;
     VERIFY_RATE_LIMIT_PER_IP_PER_HOUR: string;
+    // Issue #22 — A3 EPIC verification. loadEpicVerificationConfig's vars
+    // (verify/epic/status.ts) plus the public URL verify/epic.astro's
+    // client-side JS posts the raw EPIC number/doc to directly (HLD §4.3's
+    // "separate origin" — never proxied through this app).
+    PILOT_CONSTITUENCY_NAME_ML: string;
+    PILOT_CONSTITUENCY_NAME_EN: string;
+    COVERED_ASSEMBLY_SEGMENTS: string;
+    PUBLIC_VAULT_SVC_URL: string;
+    // Rate limit on /api/verify/epic/submit — the one call that can reveal
+    // "already verified by someone else" (409 duplicate_epic), so it's
+    // rate-limited per-member, not just Turnstile-gated upstream.
+    EPIC_LINK_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
   }
 }

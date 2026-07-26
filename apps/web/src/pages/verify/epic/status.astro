@@ -1,0 +1,84 @@
+---
+import Badge from "../../../components/Badge.astro";
+import Button from "../../../components/Button.astro";
+import Logo from "../../../components/Logo.astro";
+import TricolourHairline from "../../../components/TricolourHairline.astro";
+import "../../../styles/global.css";
+import en from "../../../i18n/en.json";
+import ml from "../../../i18n/ml.json";
+import { handleStatus } from "../../api/verify/epic/status";
+
+// A3 — EPIC verification status (issue #22). Server-rendered from the same
+// handleStatus() the /api/verify/epic/status endpoint uses — no separate
+// client-side fetch needed, this page just renders whatever state that
+// call resolves on each visit (including the tier-promotion side effect).
+const locale = Astro.url.searchParams.get("lang") === "en" ? "en" : "ml";
+const t = locale === "en" ? en : ml;
+
+const env = import.meta.env.DEV ? undefined : (await import("cloudflare:workers")).env;
+const statusRes = await handleStatus(Astro.request, env as Cloudflare.Env);
+
+if (statusRes.status === 401) {
+  return Astro.redirect("/register");
+}
+
+const body = (await statusRes.json()) as {
+  status?: "pending" | "approved" | "rejected";
+  tier?: string;
+  assemblySegment?: string | null;
+  assemblySegmentCovered?: boolean | null;
+  assemblySegmentClaimed?: string;
+  error?: string;
+};
+
+const pilotConstituencyName =
+  locale === "en"
+    ? import.meta.env.DEV
+      ? "Pilot Constituency"
+      : env?.PILOT_CONSTITUENCY_NAME_EN
+    : import.meta.env.DEV
+      ? "പൈലറ്റ് മണ്ഡലം"
+      : env?.PILOT_CONSTITUENCY_NAME_ML;
+---
+
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <title>{t["epic.status.title"]}</title>
+  </head>
+  <body>
+    <header>
+      <Logo size={40} />
+      <h1>{t["epic.status.title"]}</h1>
+    </header>
+    <TricolourHairline />
+
+    {body.error === "not_found" && (
+      <>
+        <p>{t["epic.status.notFound"]}</p>
+        <Button href={`/verify/epic?lang=${locale}`}>{t["epic.status.cta"]}</Button>
+      </>
+    )}
+
+    {body.status === "pending" && <p>{t["epic.status.pending"]}</p>}
+
+    {body.status === "approved" && body.assemblySegmentCovered === true && (
+      <Badge
+        tier="t2"
+        ward={pilotConstituencyName}
+        label={t["epic.status.badge.verifiedConstituent"].replace("{ward}", pilotConstituencyName ?? "")}
+      />
+    )}
+
+    {body.status === "approved" && body.assemblySegmentCovered === false && (
+      <section aria-readonly="true">
+        <h2>{t["epic.status.notCovered.title"]}</h2>
+        <p>{t["epic.status.notCovered.body"]}</p>
+      </section>
+    )}
+
+    {body.status === "rejected" && (
+      <p>{t["epic.status.rejected.title"]}</p>
+    )}
+  </body>
+</html>

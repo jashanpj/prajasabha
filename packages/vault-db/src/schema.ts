@@ -72,3 +72,59 @@ export const authCredentials = vault.table(
       .where(sql`${t.linked} = true`),
   ],
 );
+
+// Issue #16/#22 — A3 EPIC (voter ID) verification records for T2 tier.
+// member_id -> verification record only, no civic-activity columns
+// (CLAUDE.md invariant 1 / issue #16's AC). `memberId` is nullable: a row
+// is created by the public browser->vault-svc submit step before any
+// member is attached (mirrors auth_credentials' "insert now, attach
+// identity later" shape), then linked by apps/web's own session-authed
+// call once it knows which member_id is submitting.
+export const epicVerificationStatusEnum = vault.enum("epic_verification_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+export const epicVerifications = vault.table(
+  "epic_verifications",
+  {
+    verificationId: uuid("verification_id").primaryKey().defaultRandom(),
+    memberId: uuid("member_id"),
+    // HMAC-SHA256(EPIC_HASH_PEPPER, normalizeEpicNumber(epicNumber)) — see
+    // crypto.ts. Equality-lookup only, never reversible; the partial
+    // unique index below on this column (WHERE status = 'approved') is
+    // issue #22's AC4 "one EPIC number = one account" as a real DB
+    // constraint, not an app-level check.
+    epicNumberHash: text("epic_number_hash").notNull(),
+    // AES-GCM ciphertext/IV (EPIC_ENCRYPTION_KEY — distinct from both
+    // auth_credentials' email key and this table's own doc key, never
+    // reused across purposes). Nulled by the reviewer's approve/reject
+    // decision — see epic.ts — leaving only the hash behind.
+    epicNumberCiphertext: text("epic_number_ciphertext"),
+    epicNumberIv: text("epic_number_iv"),
+    // AES-GCM ciphertext/IV over the uploaded document/photo blob
+    // (EPIC_DOC_ENCRYPTION_KEY — a third, distinct secret). Nulled on
+    // review decision too — HLD §4.3's "photo docs deleted on decision".
+    docCiphertext: text("doc_ciphertext"),
+    docIv: text("doc_iv"),
+    assemblySegmentClaimed: text("assembly_segment_claimed").notNull(),
+    status: epicVerificationStatusEnum("status").notNull().default("pending"),
+    reviewerNote: text("reviewer_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("epic_verifications_hash_idx").on(t.epicNumberHash),
+    index("epic_verifications_member_id_idx").on(t.memberId),
+    // Partial unique index: only ONE *approved* verification may exist per
+    // EPIC-number hash — mirrors auth_credentials_email_hash_linked_uniq's
+    // WHERE-linked=true pattern exactly. Multiple pending/rejected rows for
+    // the same hash are still allowed (resubmission after rejection,
+    // concurrent review) — a collision at submit time routes to a support
+    // flow (see epic.ts's /internal/epic/link), it does not silently fail.
+    uniqueIndex("epic_verifications_hash_approved_uniq")
+      .on(t.epicNumberHash)
+      .where(sql`${t.status} = 'approved'`),
+  ],
+);

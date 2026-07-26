@@ -24,6 +24,22 @@ function testEnv(overrides: Partial<Bindings> = {}): Bindings {
     EMAIL_HASH_PEPPER: "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=",
     VAULT_SVC_INTERNAL_TOKEN: INTERNAL_TOKEN,
     MAGIC_LINK_TTL_MINUTES: "15",
+    // Issue #16/#22 — EPIC verification (unused by this file's own tests,
+    // but required to satisfy the full Bindings type since index.ts now
+    // mounts epic.ts's routes onto this same app).
+    EPIC_HASH_PEPPER: "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=",
+    EPIC_ENCRYPTION_KEY: "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=",
+    EPIC_DOC_ENCRYPTION_KEY: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+    TURNSTILE_SECRET_KEY: "turnstile-secret",
+    REVIEW_QUEUE_TOKEN: "review-queue-token",
+    REVIEW_QUEUE_IP_ALLOWLIST: "127.0.0.1",
+    RATE_LIMIT_KV: {
+      async get() {
+        return null;
+      },
+      async put() {},
+    } as unknown as KVNamespace,
+    EPIC_SUBMIT_RATE_LIMIT_PER_IP_PER_HOUR: "1000",
     ...overrides,
   };
 }
