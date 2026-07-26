@@ -96,6 +96,11 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
         </select>
       </label>
 
+      <div id="similar-suggestion" aria-live="polite" hidden>
+        <p>{t["issue.new.similar.title"]}</p>
+        <ul id="similar-list"></ul>
+      </div>
+
       <fieldset>
         <legend>{t["issue.new.photos.label"]}</legend>
         <p>{t["issue.new.photos.hint"]}</p>
@@ -124,10 +129,13 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
       const photoInput = document.getElementById("photo-input");
       const photoCount = document.getElementById("photo-count");
       const publishedSection = document.getElementById("published");
+      const similarSuggestion = document.getElementById("similar-suggestion");
+      const similarList = document.getElementById("similar-list");
 
       let issueId = null;
       let photosAdded = 0;
       let debounceTimer = null;
+      let similarDebounceTimer = null;
 
       const message = (code) => t[`issue.new.error.${code}`] ?? t["issue.new.error.generic"];
 
@@ -198,6 +206,43 @@ const wardLabel = (ward: (typeof wards)[number]): string =>
           if (input.value !== "") scheduleAutosave(field, input.value);
         });
       }
+
+      // B3 — similarity suggestion (issue #26), deliberately unranked
+      // ("ship a reasonable first pass"): once both an English title and a
+      // category are present, debounced-query /api/issues/similar and
+      // offer up to 3 published matches to support instead of duplicating.
+      function scheduleSimilarCheck() {
+        clearTimeout(similarDebounceTimer);
+        similarDebounceTimer = setTimeout(async () => {
+          const titleEn = issueForm.elements.titleEn.value.trim();
+          const category = issueForm.elements.category.value;
+          if (titleEn.length < 3 || !category) {
+            similarSuggestion.hidden = true;
+            return;
+          }
+          try {
+            const url = new URL("/api/issues/similar", window.location.origin);
+            url.searchParams.set("titleEn", titleEn);
+            url.searchParams.set("category", category);
+            const res = await fetch(url);
+            const matches = res.ok ? await res.json() : [];
+            similarList.innerHTML = "";
+            for (const match of matches) {
+              const li = document.createElement("li");
+              const a = document.createElement("a");
+              a.href = `/issues/${match.slug}`;
+              a.textContent = match.titleEn;
+              li.appendChild(a);
+              similarList.appendChild(li);
+            }
+            similarSuggestion.hidden = matches.length === 0;
+          } catch {
+            similarSuggestion.hidden = true;
+          }
+        }, 500);
+      }
+      issueForm.elements.titleEn.addEventListener("input", scheduleSimilarCheck);
+      issueForm.elements.category.addEventListener("change", scheduleSimilarCheck);
 
       // Step 2b — photo upload (one file per pick, max 5).
       photoInput.addEventListener("change", async () => {

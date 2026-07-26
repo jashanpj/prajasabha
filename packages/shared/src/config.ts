@@ -404,3 +404,61 @@ export function loadFlagRoutingRateLimitConfig(
     flagRoutingRateLimitPerMemberPerHour: env.FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR,
   });
 }
+
+// Issue #26 — B3 Support & Dedup.
+
+const ISSUE_SUPPORT_RATE_LIMIT_REQUIRED_VARS = [
+  "ISSUE_SUPPORT_RATE_LIMIT_PER_MEMBER_PER_HOUR",
+] as const;
+
+const IssueSupportRateLimitConfigSchema = z.object({
+  issueSupportRateLimitPerMemberPerHour: z.coerce.number().int().positive(),
+});
+
+export type IssueSupportRateLimitConfig = z.infer<typeof IssueSupportRateLimitConfigSchema>;
+
+/** apps/web's POST /api/issues/:issueId/support per-member hourly limit. */
+export function loadIssueSupportRateLimitConfig(
+  env: Record<string, string | undefined>,
+): IssueSupportRateLimitConfig {
+  const missing = ISSUE_SUPPORT_RATE_LIMIT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return IssueSupportRateLimitConfigSchema.parse({
+    issueSupportRateLimitPerMemberPerHour: env.ISSUE_SUPPORT_RATE_LIMIT_PER_MEMBER_PER_HOUR,
+  });
+}
+
+// B3's admin-only merge endpoint. There is no admin-role model anywhere in
+// this codebase yet, so this mirrors apps/vault-svc's loadReviewQueueConfig
+// comma-separated IP allowlist pattern almost verbatim, plus a required
+// non-empty bearer token — the second, independent factor
+// requireAdminAccess checks (apps/web/src/lib/admin-auth.ts), so a leaked
+// merge-admin token alone can't grant access from a non-allow-listed IP,
+// and vice versa (same two-factor posture as vault-svc's
+// requireReviewAccess).
+
+const ISSUE_MERGE_ADMIN_REQUIRED_VARS = [
+  "ISSUE_MERGE_ADMIN_TOKEN",
+  "ISSUE_MERGE_ADMIN_IP_ALLOWLIST",
+] as const;
+
+const IssueMergeAdminConfigSchema = z.object({
+  adminToken: z.string().min(1),
+  ipAllowlist: commaSeparatedList,
+});
+
+export type IssueMergeAdminConfig = z.infer<typeof IssueMergeAdminConfigSchema>;
+
+/** apps/web's POST /api/admin/issues/:issueId/merge bearer token + IP allowlist. */
+export function loadIssueMergeAdminConfig(
+  env: Record<string, string | undefined>,
+): IssueMergeAdminConfig {
+  const missing = ISSUE_MERGE_ADMIN_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return IssueMergeAdminConfigSchema.parse({
+    adminToken: env.ISSUE_MERGE_ADMIN_TOKEN,
+    ipAllowlist: env.ISSUE_MERGE_ADMIN_IP_ALLOWLIST,
+  });
+}

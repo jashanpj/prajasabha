@@ -68,5 +68,12 @@ declare namespace Cloudflare {
     ISSUE_PUBLISH_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
     // Issue #25 — B2 "flag misrouting" endpoint per-member hourly limit.
     FLAG_ROUTING_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
+    // Issue #26 — B3 Support & Dedup. Support endpoint's per-member hourly
+    // limit, plus the admin-only merge endpoint's bearer token + IP
+    // allowlist (no admin-role model exists yet — see
+    // apps/web/src/lib/admin-auth.ts).
+    ISSUE_SUPPORT_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
+    ISSUE_MERGE_ADMIN_TOKEN: string;
+    ISSUE_MERGE_ADMIN_IP_ALLOWLIST: string;
   }
 }
