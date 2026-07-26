@@ -96,6 +96,15 @@ export const issues = pgTable(
     photoKeys: text("photo_keys").array().notNull().default(sql`'{}'::text[]`),
     mergedInto: uuid("merged_into"),
     supportT2Count: integer("support_t2_count").notNull().default(0),
+    // Added in migration 0006 (issue #27's B4 threshold promotion).
+    // Orthogonal to `status` (visibility) — "Constituency Concern" is a
+    // deliberation-eligibility classification a published issue gains once
+    // supportT2Count crosses the configured threshold, not a new lifecycle
+    // state. Non-null itself is the "not repeated on re-crossing" guard: a
+    // single `UPDATE ... WHERE promoted_at IS NULL AND support_t2_count >=
+    // threshold` is the atomic compare-and-swap that fires the promotion
+    // event exactly once (see apps/web/src/pages/api/issues/[issueId]/support.ts).
+    promotedAt: timestamp("promoted_at", { withTimezone: true }),
     createdBy: uuid("created_by")
       .notNull()
       .references(() => members.memberId),
