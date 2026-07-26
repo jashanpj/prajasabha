@@ -64,10 +64,22 @@ const cta = !session
 // those track Module F/K data (accountability ledger, model bills) that
 // doesn't exist in this system yet, so they're omitted rather than shown
 // as fabricated zeros (see the redesign plan's Context on this).
-const [{ verifiedConstituents }] = await db
-  .select({ verifiedConstituents: sql<number>`count(*)`.mapWith(Number) })
-  .from(schema.members)
-  .where(eq(schema.members.tier, "t2"));
+//
+// Wrapped in try/catch: this is a decorative stat, not core functionality
+// — a transient DB/config issue shouldn't 500 the entire homepage over it.
+// Also the only thing standing between this page and Playwright/astro
+// preview environments that don't have APP_DATABASE_URL configured at all
+// (CI's smoke test build has no DB binding, by design).
+let verifiedConstituents: number | null = null;
+try {
+  const [row] = await db
+    .select({ verifiedConstituents: sql<number>`count(*)`.mapWith(Number) })
+    .from(schema.members)
+    .where(eq(schema.members.tier, "t2"));
+  verifiedConstituents = row?.verifiedConstituents ?? null;
+} catch {
+  verifiedConstituents = null;
+}
 ---
 
 <html lang={locale}>
@@ -87,9 +99,11 @@ const [{ verifiedConstituents }] = await db
               {t["home.hero.seeHowItWorks"]}
             </Button>
           </div>
-          <p class="ps-hero__stat tabular-nums">
-            {t["home.stats.verifiedConstituents"].replace("{count}", `${verifiedConstituents}`)}
-          </p>
+          {verifiedConstituents !== null && (
+            <p class="ps-hero__stat tabular-nums">
+              {t["home.stats.verifiedConstituents"].replace("{count}", `${verifiedConstituents}`)}
+            </p>
+          )}
         </div>
         <div class="ps-hero__features">
           <div class="ps-card">

@@ -55,7 +55,14 @@ jobs:
           VAULT_DATABASE_URL: postgres://postgres:postgres@localhost:5432/prajasabha_test
 
       - name: Unit + endpoint authz tests
-        run: pnpm -r test
+        # --workspace-concurrency=1: every test file across every package
+        # opens its own Postgres connection pool (getServiceRoleDb /
+        # equivalent); running packages concurrently races the CI Postgres
+        # container's connection limit even with each package's own
+        # fileParallelism disabled (see apps/web and apps/vault-svc's
+        # vitest.config.ts) — confirmed serial-across-packages is what
+        # actually makes this deterministic, not just serial-within-package.
+        run: pnpm -r --workspace-concurrency=1 test
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/prajasabha_test
           VAULT_DATABASE_URL: postgres://postgres:postgres@localhost:5432/prajasabha_test
