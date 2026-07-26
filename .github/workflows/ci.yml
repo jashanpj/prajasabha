@@ -44,15 +44,27 @@ jobs:
       - name: Type check
         run: pnpm -r exec tsc --noEmit
 
-      - name: Migration dry-run
+      - name: Migration dry-run (packages/db)
         run: pnpm --filter db exec drizzle-kit check
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/prajasabha_test
+
+      - name: Migration dry-run (packages/vault-db)
+        run: pnpm --filter vault-db exec drizzle-kit check
+        env:
+          VAULT_DATABASE_URL: postgres://postgres:postgres@localhost:5432/prajasabha_test
 
       - name: Unit + endpoint authz tests
         run: pnpm -r test
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/prajasabha_test
+          VAULT_DATABASE_URL: postgres://postgres:postgres@localhost:5432/prajasabha_test
+          # app_role/vault_role are created idempotently by packages/db's
+          # migration 0002 and packages/vault-db's migration 0000 (CI has no
+          # docker-compose init script) — same dev-only passwords documented
+          # there and in docker/postgres/init/01-schemas-and-roles.sql.
+          APP_DATABASE_URL: postgres://app_role:app_role_dev_only@localhost:5432/prajasabha_test
+          VAULT_SVC_DATABASE_URL: postgres://vault_role:vault_role_dev_only@localhost:5432/prajasabha_test
 
       - name: i18n parity check
         run: pnpm exec node scripts/check-i18n-parity.mjs

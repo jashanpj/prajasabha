@@ -14,13 +14,26 @@ git clone https://github.com/jashanpj/prajasabha.git
 cd prajasabha
 pnpm install
 cp .env.example .env
-docker compose up -d          # local Postgres: `public` (participation) + `vault` schema
-pnpm --filter db run migrate  # applies packages/db's migrations
+docker compose up -d                # local Postgres: `public` (participation) + `vault` schema
+pnpm --filter db run migrate        # applies packages/db's migrations
+pnpm --filter vault-db run migrate  # applies packages/vault-db's migrations
 pnpm dev
 ```
 
 You don't need a Supabase or Cloudflare account to get a local dev loop
 running — those are only required for deploying, not for building.
+
+Registration (issue #20) is served across two Workers: `apps/web` (the
+form + API endpoints) and `apps/vault-svc` (the only thing that talks to
+the identity vault, reached via a Cloudflare service binding, never a
+direct import). `pnpm dev` runs both — but a real `wrangler dev` service
+binding between two separately-running dev servers needs each Worker's
+`wrangler dev` pointed at the other via `--host`/config, which isn't fully
+wired up yet for local multi-worker dev; `pnpm --filter web test` /
+`pnpm --filter vault-svc test` exercise the full logic against a real
+Postgres without needing that (each test mocks the other side's HTTP
+boundary — see `apps/web/src/pages/api/auth/register/*.test.ts` and
+`apps/vault-svc/src/index.test.ts`).
 
 `docker-compose.yml` runs a single Postgres container with two schemas,
 `public` and `vault`, isolated from each other by role grants (see the

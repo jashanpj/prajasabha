@@ -11,3 +11,4 @@ export function createDbClient(databaseUrl: string) {
 }
 
 export { schema };
+export { runMigrations } from "./migrate";

@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prajasabha-vault-svc",
+  "main": "./src/index.ts",
+  "compatibility_date": "2025-01-01",
+  // Needed for packages/vault-db's `pg` (node-postgres) driver, same as
+  // apps/web/apps/api. Real production Postgres connectivity from a
+  // Worker needs a Hyperdrive binding (HLD §8: "Hyperdrive + Supavisor
+  // session-mode smoke test from Workers") — not wired up here, that's a
+  // deploy-readiness follow-up, out of scope for this issue. Local dev
+  // (docker-compose) and CI (Vitest, running in Node) are unaffected.
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": {
+    "port": 8789,
+    "inspector_port": 19231
+  }
+}

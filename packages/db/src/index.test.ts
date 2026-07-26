@@ -11,6 +11,7 @@ describe("packages/db entrypoint", () => {
         "issueStatusEnum",
         "issueSupport",
         "issues",
+        "localeEnum",
         "memberTierEnum",
         "members",
         "moderationActions",

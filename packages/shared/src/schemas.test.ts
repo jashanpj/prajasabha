@@ -18,13 +18,19 @@ describe("registrationRequestSchema (A1, email magic-link)", () => {
         email: "voter@example.com",
         pseudonym: "Constituent K-417",
         locale: "ml",
+        turnstileToken: "XXXX.DUMMY.TOKEN",
       }),
     ).toBeTruthy();
   });
 
   it("rejects an invalid email", () => {
     expect(() =>
-      registrationRequestSchema.parse({ email: "not-an-email", pseudonym: "abc", locale: "ml" }),
+      registrationRequestSchema.parse({
+        email: "not-an-email",
+        pseudonym: "abc",
+        locale: "ml",
+        turnstileToken: "t",
+      }),
     ).toThrow();
   });
 
@@ -34,6 +40,17 @@ describe("registrationRequestSchema (A1, email magic-link)", () => {
         email: "voter@example.com",
         pseudonym: "abc",
         locale: "hi",
+        turnstileToken: "t",
+      }),
+    ).toThrow();
+  });
+
+  it("rejects a missing turnstileToken", () => {
+    expect(() =>
+      registrationRequestSchema.parse({
+        email: "voter@example.com",
+        pseudonym: "abc",
+        locale: "ml",
       }),
     ).toThrow();
   });
