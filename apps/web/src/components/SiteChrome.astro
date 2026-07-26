@@ -85,10 +85,11 @@ const otherLocaleHref = `${currentPath}?lang=${locale === "en" ? "ml" : "en"}`;
     <a href={withLang("/")} aria-current={currentPath === "/" ? "page" : undefined}
       >{t["nav.home"]}</a
     >
-    <a
-      href={withLang("/dashboard")}
-      aria-current={currentPath === "/dashboard" ? "page" : undefined}>{t["nav.dashboard"]}</a
-    >
+    {
+      /* Dashboard nav link added in #90, once apps/web/src/pages/dashboard.astro
+         actually exists — omitted here rather than dead-linked (see #88's
+         "nav links only to pages that exist today"). */
+    }
   </div>
   <div class="ps-nav__right">
     <a href={otherLocaleHref} class="ps-nav__lang">{locale === "en" ? "മലയാളം" : "EN"}</a>
