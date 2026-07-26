@@ -117,7 +117,15 @@ export const issues = pgTable(
       .notNull()
       .references(() => members.memberId),
   },
-  (t) => [index("issues_ward_idx").on(t.wardId), index("issues_status_idx").on(t.status)],
+  (t) => [
+    index("issues_ward_idx").on(t.wardId),
+    index("issues_status_idx").on(t.status),
+    // Added in migration 0008 (issue #90's dashboard "Constituency
+    // concerns" ranked-by-support list) — that query filters
+    // status='published' then orders by supportT2Count desc on every
+    // anonymous page load.
+    index("issues_status_support_idx").on(t.status, t.supportT2Count),
+  ],
 );
 
 export const issueSupport = pgTable(
@@ -142,16 +150,24 @@ export const authorities = pgTable("authorities", {
   nameEn: text("name_en").notNull(),
 });
 
-export const routings = pgTable("routings", {
-  issueId: uuid("issue_id")
-    .notNull()
-    .references(() => issues.issueId),
-  authorityId: uuid("authority_id")
-    .notNull()
-    .references(() => authorities.authorityId),
-  role: routingRoleEnum("role").notNull(),
-  legalBasisRef: text("legal_basis_ref"),
-});
+export const routings = pgTable(
+  "routings",
+  {
+    issueId: uuid("issue_id")
+      .notNull()
+      .references(() => issues.issueId),
+    authorityId: uuid("authority_id")
+      .notNull()
+      .references(() => authorities.authorityId),
+    role: routingRoleEnum("role").notNull(),
+    legalBasisRef: text("legal_basis_ref"),
+  },
+  // Added in migration 0008 (issue #90's dashboard) — issues/[slug].astro
+  // and dashboard.astro both look up routings by issueId (a FK has no
+  // implicit index in Postgres), and the dashboard's variant runs on every
+  // anonymous homepage-adjacent load.
+  (t) => [index("routings_issue_id_idx").on(t.issueId)],
+);
 
 // Added in migration 0005 (issue #25's B2 Responsibility Router). Pure
 // category/ward/authority/legal-citation reference data — no identity

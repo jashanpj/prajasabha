@@ -3,13 +3,14 @@ import AuthorityChip from "../components/AuthorityChip.astro";
 import SiteChrome from "../components/SiteChrome.astro";
 import "../styles/global.css";
 import { schema } from "db";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import en from "../i18n/en.json";
 import ml from "../i18n/ml.json";
 import { getServiceRoleDb } from "../lib/db";
 
 // Constituency dashboard (issue #90 — matches web/dashboard.dc.html's
-// "Constituency concerns" ranked list). Public read, same visibility rule
+// "Constituency concerns" list, sorted by support count). Public read,
+// same visibility rule
 // as issues/[slug].astro (status='published' — RLS's issues_public_read
 // policy doesn't gate this service-role connection, so it's re-checked in
 // application logic here too).
@@ -59,7 +60,15 @@ if (topIssues.length > 0) {
     })
     .from(schema.routings)
     .innerJoin(schema.authorities, eq(schema.routings.authorityId, schema.authorities.authorityId))
-    .where(eq(schema.routings.role, "responsible"));
+    .where(
+      and(
+        eq(schema.routings.role, "responsible"),
+        inArray(
+          schema.routings.issueId,
+          topIssues.map((issue) => issue.issueId),
+        ),
+      ),
+    );
   for (const row of routingRows) {
     if (!responsibleAuthorityByIssue.has(row.issueId)) {
       responsibleAuthorityByIssue.set(row.issueId, {
@@ -94,7 +103,7 @@ function authorityName(authority: { nameMl: string; nameEn: string }): string {
           topIssues.length === 0 ? (
             <p>{t["dashboard.concerns.empty"]}</p>
           ) : (
-            <ol class="ps-concerns__list">
+            <ul class="ps-concerns__list">
               {topIssues.map((issue) => {
                 const authority = responsibleAuthorityByIssue.get(issue.issueId);
                 return (
@@ -118,7 +127,7 @@ function authorityName(authority: { nameMl: string; nameEn: string }): string {
                   </li>
                 );
               })}
-            </ol>
+            </ul>
           )
         }
         <p class="ps-concerns__total">

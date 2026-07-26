@@ -57,6 +57,13 @@
       "when": 1785079357368,
       "tag": "0007_add_members_tier_index",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785080174627,
+      "tag": "0008_add_dashboard_indexes",
+      "breakpoints": true
     }
   ]
 }
