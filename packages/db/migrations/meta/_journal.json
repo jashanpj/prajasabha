@@ -71,6 +71,13 @@
       "when": 1785087119145,
       "tag": "0009_add_deliberations",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785091047219,
+      "tag": "0010_add_statements_and_votes",
+      "breakpoints": true
     }
   ]
 }
