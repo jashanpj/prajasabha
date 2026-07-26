@@ -26,7 +26,13 @@
   // issues.photo_keys. Needs a real bucket per environment
   // (`wrangler r2 bucket create prajasabha-issue-photos`) before deploying
   // — local `wrangler dev` emulates it.
-  "r2_buckets": [{ "binding": "ISSUE_PHOTOS", "bucket_name": "prajasabha-issue-photos" }]
+  // Issue #34 — C2 consensus export (GET /api/issues/:issueId/consensus-
+  // export) reads the same bucket apps/jobs' lifecycle sweep writes the
+  // generated PDF into — a thin passthrough, never a write from this app.
+  "r2_buckets": [
+    { "binding": "ISSUE_PHOTOS", "bucket_name": "prajasabha-issue-photos" },
+    { "binding": "DELIBERATION_ARTIFACTS", "bucket_name": "prajasabha-deliberation-artifacts" }
+  ]
   // Secrets (never committed — set via `wrangler secret put <NAME>` per
   // environment, or a gitignored .env/.dev.vars locally): APP_DATABASE_URL,
   // VAULT_SVC_INTERNAL_TOKEN, RESEND_API_KEY, TURNSTILE_SECRET_KEY,
@@ -48,5 +54,6 @@
   // (issue #35), STATEMENT_SUBMIT_RATE_LIMIT_PER_MEMBER_PER_HOUR,
   // STATEMENT_VOTE_RATE_LIMIT_PER_MEMBER_PER_HOUR,
   // STATEMENT_MODERATION_ADMIN_TOKEN, STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST
-  // (issue #33) — see .env.example.
+  // (issue #33), CONSENSUS_AGREEMENT_THRESHOLD_PERCENT, CONSENSUS_MIN_VOTERS
+  // (issue #34) — see .env.example.
 }

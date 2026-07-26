@@ -191,5 +191,13 @@
   "issue.detail.deliberation.submit.error.invalid_body": "പ്രസ്താവനകൾ 1 മുതൽ 280 വരെ അക്ഷരങ്ങൾക്കിടയിൽ ആയിരിക്കണം.",
   "issue.detail.deliberation.submit.error.deliberation_not_open": "ഈ ചർച്ച ഇനി പുതിയ പ്രസ്താവനകൾക്കായി തുറന്നിട്ടില്ല.",
   "issue.detail.deliberation.submit.error.rate_limited": "ഈ പ്രവർത്തനത്തിനുള്ള മണിക്കൂർ പരിധി കവിഞ്ഞു. ദയവായി പിന്നീട് ശ്രമിക്കുക.",
-  "issue.detail.deliberation.submit.error.generic": "എന്തോ പിശക് സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കുക."
+  "issue.detail.deliberation.submit.error.generic": "എന്തോ പിശക് സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
+  "issue.detail.consensus.title": "സമവായ പ്രസ്താവനകൾ",
+  "issue.detail.consensus.subtitle": "ഈ ചർച്ചയിലെ പ്രസ്താവനകളിലുള്ള യോജിക്കുന്നു/വിയോജിക്കുന്നു വോട്ടുകളുടെ തത്സമയ കണക്ക്.",
+  "issue.detail.consensus.broadAgreement.title": "വിശാലമായ യോജിപ്പ്",
+  "issue.detail.consensus.allStatements.title": "എല്ലാ പ്രസ്താവനകളും",
+  "issue.detail.consensus.percentAgree": "{percent}% യോജിക്കുന്നു",
+  "issue.detail.consensus.sampleCaveat": "സാമ്പിൾ: {totalT2Count} സ്ഥിരീകരിച്ച നിവാസികളിൽ {sampleSize} ({t2Share}%).",
+  "issue.detail.consensus.sampleOnly": "സാമ്പിൾ: {sampleSize} വോട്ടുകൾ.",
+  "issue.detail.consensus.downloadReport": "സമവായ റിപ്പോർട്ട് ഡൗൺലോഡ് ചെയ്യുക (PDF)"
 }
