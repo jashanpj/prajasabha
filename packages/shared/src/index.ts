@@ -1,6 +1,7 @@
 export const APP_NAME = "PrajaSabha";
 
 export * from "./config";
+export * from "./consensus";
 export * from "./deliberation-lifecycle";
 export * from "./deliberation-pdf";
 export * from "./exif-strip";

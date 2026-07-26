@@ -117,6 +117,13 @@ async function deleteVotesByMember(memberId: string): Promise<void> {
   await db.delete(schema.statementVotes).where(eq(schema.statementVotes.memberId, memberId));
 }
 
+interface NextStatementResponse {
+  done: boolean;
+  position: number;
+  total: number;
+  statement?: { statementId: string; body: string };
+}
+
 function callNext(
   env: ReturnType<typeof testEnv>,
   deliberationId: string,
@@ -203,7 +210,7 @@ describe("handleNextStatement (GET /api/deliberations/:deliberationId/statements
       const cookie = await sessionCookie(author);
       const res = await callNext(testEnv(), deliberationId, cookie);
       expect(res.status).toBe(200);
-      const json = await res.json();
+      const json = (await res.json()) as NextStatementResponse;
       expect(json.done).toBe(true);
     } finally {
       if (deliberationId) await deleteStatements(deliberationId);
@@ -230,7 +237,7 @@ describe("handleNextStatement (GET /api/deliberations/:deliberationId/statements
       const cookie = await sessionCookie(voter);
       const res = await callNext(testEnv(), deliberationId, cookie);
       expect(res.status).toBe(200);
-      const json = await res.json();
+      const json = (await res.json()) as NextStatementResponse;
       expect(json.done).toBe(true);
       expect(json.position).toBe(1); // 1 already voted
       expect(json.total).toBe(1); // 1 approved statement total
@@ -259,7 +266,7 @@ describe("handleNextStatement (GET /api/deliberations/:deliberationId/statements
       const cookie = await sessionCookie(voter);
       const res = await callNext(testEnv(), deliberationId, cookie);
       expect(res.status).toBe(200);
-      const json = await res.json();
+      const json = (await res.json()) as NextStatementResponse;
       expect(json.done).toBe(true);
       expect(json.total).toBe(0); // pending statements don't count toward "approved"
     } finally {
@@ -287,9 +294,9 @@ describe("handleNextStatement (GET /api/deliberations/:deliberationId/statements
       const cookie = await sessionCookie(voter);
       const res = await callNext(testEnv(), deliberationId, cookie);
       expect(res.status).toBe(200);
-      const json = await res.json();
+      const json = (await res.json()) as NextStatementResponse;
       expect(json.done).toBe(false);
-      expect(json.statement.statementId).toBe(statementId);
+      expect(json.statement?.statementId).toBe(statementId);
       expect(json.position).toBe(1);
       expect(json.total).toBe(1);
     } finally {

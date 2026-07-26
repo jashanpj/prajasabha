@@ -1,6 +1,11 @@
 import { schema } from "db";
 import { and, eq, inArray, lte, sql } from "drizzle-orm";
-import { assertValidDeliberationTransition, generateDeliberationSummaryPdf } from "shared";
+import {
+  type StatementTally,
+  assertValidDeliberationTransition,
+  computeConsensus,
+  generateDeliberationSummaryPdf,
+} from "shared";
 
 // Issue #35 — C3 Deliberation Lifecycle. The only mutator of deliberation
 // state in this phase — apps/jobs' scheduled() (index.ts) is a thin
@@ -13,11 +18,9 @@ import { assertValidDeliberationTransition, generateDeliberationSummaryPdf } fro
 // end of that same run — matching todo.md's demo arc ("vote -> see
 // consensus"), not a day later.
 //
-// PR1 (this commit) has no statements/statement_votes tables yet
-// (packages/db/src/schema.ts gains those in issue #33's PR) — so every
-// summarization in this phase passes an empty consensus-statement list.
-// issue #34's PR replaces the stubbed empty array below with a real vote
-// tally query; nothing else in this file changes when it does.
+// Summarization computes the real "Broad agreement" set (issue #34) from
+// statement_votes at the moment a deliberation closes — see the tally/
+// computeConsensus block below.
 
 // A minimal structural subset of Cloudflare's R2Bucket — enough for this
 // module's one write, real in production (env.DELIBERATION_ARTIFACTS),
@@ -104,14 +107,70 @@ export async function runDeliberationLifecycleSweep(
       .where(eq(schema.members.tier, "t2"));
 
     for (const deliberation of dueToSummarize) {
+      // Issue #34 — C2 Consensus Surface. Only approved statements count;
+      // pending/rejected ones never entered the vote pool at all (see
+      // statements/next.ts's own status='approved' filter). Aggregated in
+      // application code rather than a SQL pivot — pilot scale is small,
+      // and this keeps computeConsensus (packages/shared) as the single
+      // source of truth for the actual math on both sides (this cron sweep
+      // and apps/web's live consensus page).
+      const approvedStatements: { statementId: string; body: string }[] = await db
+        .select({ statementId: schema.statements.statementId, body: schema.statements.body })
+        .from(schema.statements)
+        .where(
+          and(
+            eq(schema.statements.deliberationId, deliberation.deliberationId),
+            eq(schema.statements.status, "approved"),
+          ),
+        );
+
+      const votes: { statementId: string; vote: "agree" | "disagree" | "pass" }[] = await db
+        .select({
+          statementId: schema.statementVotes.statementId,
+          vote: schema.statementVotes.vote,
+        })
+        .from(schema.statementVotes)
+        .innerJoin(
+          schema.statements,
+          eq(schema.statements.statementId, schema.statementVotes.statementId),
+        )
+        .where(
+          and(
+            eq(schema.statements.deliberationId, deliberation.deliberationId),
+            eq(schema.statements.status, "approved"),
+          ),
+        );
+
+      const talliesByStatementId = new Map<string, StatementTally>(
+        approvedStatements.map((s) => [
+          s.statementId,
+          { statementId: s.statementId, body: s.body, agree: 0, disagree: 0, pass: 0 },
+        ]),
+      );
+      for (const v of votes) {
+        const tally = talliesByStatementId.get(v.statementId);
+        if (tally) tally[v.vote] += 1;
+      }
+
+      const consensusResults = computeConsensus([...talliesByStatementId.values()], {
+        agreementThresholdPercent: config.agreementThresholdPercent,
+        minVoters: config.minVoters,
+      });
+      const broadAgreement = consensusResults
+        .filter((r) => r.meetsThreshold)
+        .map((r) => ({
+          statementId: r.statementId,
+          body: r.body,
+          agreePercent: r.agreePercent,
+          sampleSize: r.sampleSize,
+        }));
+
       const pdfBytes = await generateDeliberationSummaryPdf({
         issueTitleEn: deliberation.issueTitleEn,
         openedAt: deliberation.openedAt,
         closedAt: deliberation.closedAt ?? new Date(),
         totalT2Count,
-        // PR3 (issue #34) replaces this stub with a real, threshold-filtered
-        // vote-tally query once statements/statement_votes exist.
-        consensusStatements: [],
+        consensusStatements: broadAgreement,
         agreementThresholdPercent: config.agreementThresholdPercent,
         minVoters: config.minVoters,
         generatedAt: new Date(),

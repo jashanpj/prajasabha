@@ -4,7 +4,7 @@ import Button from "../../components/Button.astro";
 import SiteChrome from "../../components/SiteChrome.astro";
 import "../../styles/global.css";
 import { schema } from "db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { verifySession } from "shared";
 import en from "../../i18n/en.json";
 import ml from "../../i18n/ml.json";
@@ -137,10 +137,14 @@ function wardName(wardId: string): string {
 // promoted (support.ts's CAS transaction opens it atomically with
 // promotion) — so, like the support sidebar below, this is gated on
 // `published` and simply absent otherwise, not stubbed/faked.
-let deliberation: { state: string; closesAt: Date } | null = null;
+let deliberation: { deliberationId: string; state: string; closesAt: Date } | null = null;
 if (issue.status === "published") {
   const [row] = await db
-    .select({ state: schema.deliberations.state, closesAt: schema.deliberations.closesAt })
+    .select({
+      deliberationId: schema.deliberations.deliberationId,
+      state: schema.deliberations.state,
+      closesAt: schema.deliberations.closesAt,
+    })
     .from(schema.deliberations)
     .where(eq(schema.deliberations.issueId, issue.issueId))
     .limit(1);
@@ -149,6 +153,82 @@ if (issue.status === "published") {
 function deliberationStateLabel(state: string, closesAt: Date): string {
   const template = t[`issue.detail.deliberation.state.${state}`] ?? state;
   return template.replace("{closesAt}", timelineTimestamp(closesAt));
+}
+
+// C2 — Consensus Surface (issue #34). Computed fresh on every page load
+// (not the frozen PDF, which is generated once by apps/jobs' cron sweep on
+// the closed->summarized transition — see consensus-export.ts) — the same
+// computeConsensus function (packages/shared) both sides use, so the math
+// can never drift between the live page and the exported artifact.
+// Rendered whenever a deliberation exists, at any state: consensus is
+// meaningful to show even before the deliberation closes.
+let consensusStatements: {
+  statementId: string;
+  body: string;
+  agreePercent: number;
+  sampleSize: number;
+  meetsThreshold: boolean;
+}[] = [];
+let totalT2Count: number | null = null;
+if (deliberation) {
+  const { computeConsensus, loadConsensusConfig } = await import("shared");
+  const consensusConfig = import.meta.env.DEV
+    ? { agreementThresholdPercent: 70, minVoters: 30 }
+    : loadConsensusConfig(env as unknown as Record<string, string | undefined>);
+
+  const approvedStatements = await db
+    .select({ statementId: schema.statements.statementId, body: schema.statements.body })
+    .from(schema.statements)
+    .where(
+      and(
+        eq(schema.statements.deliberationId, deliberation.deliberationId),
+        eq(schema.statements.status, "approved"),
+      ),
+    );
+
+  const votes = await db
+    .select({ statementId: schema.statementVotes.statementId, vote: schema.statementVotes.vote })
+    .from(schema.statementVotes)
+    .innerJoin(
+      schema.statements,
+      eq(schema.statements.statementId, schema.statementVotes.statementId),
+    )
+    .where(
+      and(
+        eq(schema.statements.deliberationId, deliberation.deliberationId),
+        eq(schema.statements.status, "approved"),
+      ),
+    );
+
+  const talliesByStatementId = new Map(
+    approvedStatements.map((s) => [
+      s.statementId,
+      { statementId: s.statementId, body: s.body, agree: 0, disagree: 0, pass: 0 },
+    ]),
+  );
+  for (const v of votes) {
+    const tally = talliesByStatementId.get(v.statementId);
+    if (tally) tally[v.vote] += 1;
+  }
+
+  consensusStatements = computeConsensus([...talliesByStatementId.values()], consensusConfig);
+
+  const [t2CountRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.members)
+    .where(eq(schema.members.tier, "t2"));
+  totalT2Count = t2CountRow?.count ?? null;
+}
+const broadAgreementStatements = consensusStatements.filter((s) => s.meetsThreshold);
+function sampleSizeCaveat(sampleSize: number): string {
+  if (totalT2Count === null || totalT2Count === 0) {
+    return t["issue.detail.consensus.sampleOnly"].replace("{sampleSize}", `${sampleSize}`);
+  }
+  const t2Share = Math.round((sampleSize / totalT2Count) * 100);
+  return t["issue.detail.consensus.sampleCaveat"]
+    .replace("{sampleSize}", `${sampleSize}`)
+    .replace("{totalT2Count}", `${totalT2Count}`)
+    .replace("{t2Share}", `${t2Share}`);
 }
 
 let supporterRows: { pseudonym: string; wardId: string }[] = [];
@@ -285,6 +365,65 @@ function timelineTimestamp(at: Date): string {
                 <p>{t["issue.detail.deliberation.tierPrompt"]}</p>
               ) : (
                 <p>{t["issue.detail.deliberation.loginPrompt"]}</p>
+              )}
+            </div>
+          )}
+
+          {deliberation && consensusStatements.length > 0 && (
+            <div class="ps-card">
+              <h2>{t["issue.detail.consensus.title"]}</h2>
+              <p class="ps-deliberation-subtitle">{t["issue.detail.consensus.subtitle"]}</p>
+
+              {broadAgreementStatements.length > 0 && (
+                <div class="ps-broad-agreement">
+                  <h3>{t["issue.detail.consensus.broadAgreement.title"]}</h3>
+                  <ul class="ps-consensus-list">
+                    {broadAgreementStatements.map((s) => (
+                      <li>
+                        <span class="ps-consensus-body">{s.body}</span>
+                        <span class="ps-consensus-bar">
+                          <span class="ps-consensus-bar__fill ps-consensus-bar__fill--meets" style={`width:${s.agreePercent}%`} />
+                        </span>
+                        <span class="ps-consensus-percent ps-consensus-percent--meets tabular-nums">
+                          {t["issue.detail.consensus.percentAgree"].replace("{percent}", `${s.agreePercent}`)}
+                        </span>
+                        <span class="ps-consensus-caveat">{sampleSizeCaveat(s.sampleSize)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div class="ps-all-statements">
+                <h3>{t["issue.detail.consensus.allStatements.title"]}</h3>
+                <ul class="ps-consensus-list">
+                  {consensusStatements.map((s) => (
+                    <li>
+                      <span class="ps-consensus-body">{s.body}</span>
+                      <span class="ps-consensus-bar">
+                        <span
+                          class={`ps-consensus-bar__fill ${s.meetsThreshold ? "ps-consensus-bar__fill--meets" : ""}`}
+                          style={`width:${s.agreePercent}%`}
+                        />
+                      </span>
+                      <span
+                        class={`ps-consensus-percent tabular-nums ${s.meetsThreshold ? "ps-consensus-percent--meets" : ""}`}
+                      >
+                        {t["issue.detail.consensus.percentAgree"].replace("{percent}", `${s.agreePercent}`)}
+                      </span>
+                      <span class="ps-consensus-caveat">{sampleSizeCaveat(s.sampleSize)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {deliberation.state === "summarized" && (
+                <a
+                  href={`/api/issues/${issue.issueId}/consensus-export`}
+                  class="ps-routing-explainer-link"
+                >
+                  {t["issue.detail.consensus.downloadReport"]}
+                </a>
               )}
             </div>
           )}
@@ -710,6 +849,71 @@ function timelineTimestamp(at: Date): string {
         font-size: var(--font-size-caption);
       }
       .ps-char-count {
+        color: var(--color-muted);
+        font-size: var(--font-size-caption);
+      }
+      .ps-broad-agreement,
+      .ps-all-statements {
+        margin-top: 0.75em;
+      }
+      .ps-broad-agreement h3,
+      .ps-all-statements h3 {
+        font-size: var(--font-size-section-label);
+        margin-bottom: 0.5em;
+      }
+      .ps-consensus-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        border: 1px solid var(--color-card-border);
+        border-radius: var(--radius-card);
+        background: #fff;
+      }
+      .ps-consensus-list li {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.9em;
+        padding: 0.9em 1.2em;
+        border-bottom: 1px solid var(--color-card-border);
+      }
+      .ps-consensus-list li:last-child {
+        border-bottom: none;
+      }
+      .ps-consensus-body {
+        flex: 1 1 220px;
+        font-size: var(--font-size-body);
+      }
+      .ps-consensus-bar {
+        width: 140px;
+        height: 8px;
+        border-radius: 4px;
+        background: var(--progress-track);
+        overflow: hidden;
+        display: block;
+        flex-shrink: 0;
+      }
+      .ps-consensus-bar__fill {
+        display: block;
+        height: 100%;
+        background: var(--color-navy);
+      }
+      .ps-consensus-bar__fill--meets {
+        background: var(--color-green);
+      }
+      .ps-consensus-percent {
+        width: 70px;
+        font-size: var(--font-size-body);
+        font-weight: 700;
+        color: var(--color-navy);
+        text-align: right;
+        flex-shrink: 0;
+      }
+      .ps-consensus-percent--meets {
+        color: var(--status-acted-upon-text);
+      }
+      .ps-consensus-caveat {
+        flex-basis: 100%;
         color: var(--color-muted);
         font-size: var(--font-size-caption);
       }

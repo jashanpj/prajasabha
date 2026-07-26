@@ -93,5 +93,14 @@ declare namespace Cloudflare {
     STATEMENT_VOTE_RATE_LIMIT_PER_MEMBER_PER_HOUR: string;
     STATEMENT_MODERATION_ADMIN_TOKEN: string;
     STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST: string;
+    // Issue #34 — C2 Consensus Surface. Read-only from this app — the
+    // consensus-export endpoint streams back whatever apps/jobs' cron
+    // sweep already wrote here, never writes to it itself.
+    DELIBERATION_ARTIFACTS: R2Bucket;
+    // Same "Broad agreement" threshold apps/jobs' lifecycle-sweep.ts
+    // consumes — issues/[slug].astro reads it too, to compute the live
+    // (not-yet-frozen) consensus numbers on every page load.
+    CONSENSUS_AGREEMENT_THRESHOLD_PERCENT: string;
+    CONSENSUS_MIN_VOTERS: string;
   }
 }
