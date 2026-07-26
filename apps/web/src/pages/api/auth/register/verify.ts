@@ -107,7 +107,10 @@ export async function handleVerify(
   return new Response(null, {
     status: 303,
     headers: {
-      Location: "/",
+      // Issue #86 — the next actionable step for a freshly-verified T0
+      // member: T1/Aadhaar is postponed, so EPIC verification is the only
+      // path to full participation (flips tier straight to 't2').
+      Location: "/verify/epic",
       "Set-Cookie": `ps_session=${sessionCookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${THIRTY_DAYS_MS / 1000}`,
     },
   });
