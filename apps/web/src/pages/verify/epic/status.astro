@@ -47,35 +47,38 @@ const pilotConstituencyName =
   </head>
   <body>
     <SiteChrome locale={locale}>
-      <h1>{t["epic.status.title"]}</h1>
+      <div class="ps-card">
+        <h1>{t["epic.status.title"]}</h1>
 
-    {body.error === "not_found" && (
-      <>
-        <p>{t["epic.status.notFound"]}</p>
-        <Button href={`/verify/epic?lang=${locale}`}>{t["epic.status.cta"]}</Button>
-      </>
-    )}
+        {body.error === "not_found" && (
+          <>
+            <p>{t["epic.status.notFound"]}</p>
+            <Button href={`/verify/epic?lang=${locale}`}>{t["epic.status.cta"]}</Button>
+          </>
+        )}
 
-    {body.status === "pending" && <p>{t["epic.status.pending"]}</p>}
+        {body.status === "pending" && <p>{t["epic.status.pending"]}</p>}
 
-    {body.status === "approved" && body.assemblySegmentCovered === true && (
-      <Badge
-        tier="t2"
-        ward={pilotConstituencyName}
-        label={t["epic.status.badge.verifiedConstituent"].replace("{ward}", pilotConstituencyName ?? "")}
-      />
-    )}
+        {body.status === "approved" && body.assemblySegmentCovered === true && (
+          <Badge
+            tier="t2"
+            ward={pilotConstituencyName}
+            label={t["epic.status.badge.verifiedConstituent"].replace(
+              "{ward}",
+              pilotConstituencyName ?? "",
+            )}
+          />
+        )}
 
-    {body.status === "approved" && body.assemblySegmentCovered === false && (
-      <section aria-readonly="true">
-        <h2>{t["epic.status.notCovered.title"]}</h2>
-        <p>{t["epic.status.notCovered.body"]}</p>
-      </section>
-    )}
+        {body.status === "approved" && body.assemblySegmentCovered === false && (
+          <section aria-readonly="true">
+            <h2>{t["epic.status.notCovered.title"]}</h2>
+            <p>{t["epic.status.notCovered.body"]}</p>
+          </section>
+        )}
 
-    {body.status === "rejected" && (
-      <p>{t["epic.status.rejected.title"]}</p>
-    )}
+        {body.status === "rejected" && <p>{t["epic.status.rejected.title"]}</p>}
+      </div>
     </SiteChrome>
   </body>
 </html>

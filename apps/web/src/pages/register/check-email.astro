@@ -17,8 +17,10 @@ const checkEmailBody = t["register.checkEmail.body"].replace("{ttl}", ttl);
   </head>
   <body>
     <SiteChrome locale={locale}>
-      <h1>{t["register.checkEmail.title"]}</h1>
-      <p>{checkEmailBody}</p>
+      <div class="ps-card">
+        <h1>{t["register.checkEmail.title"]}</h1>
+        <p>{checkEmailBody}</p>
+      </div>
     </SiteChrome>
   </body>
 </html>
