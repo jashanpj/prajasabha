@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { schema } from "db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { signSession } from "shared";
 import { describe, expect, it } from "vitest";
 import { getServiceRoleDb } from "../../../lib/db";
@@ -84,6 +84,18 @@ async function getIssue(issueId: string) {
   return row;
 }
 
+// B5 — Issue Timeline (issue #28). event_log is append-only (no DELETE
+// grant to any role, CLAUDE.md invariant 3) — cleanup here only ever
+// deletes the member/issue rows, never event_log rows, matching
+// flag-routing.test.ts / merge.test.ts's existing convention in this repo.
+async function getEventLogRows(issueId: string, kind: string) {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  return db
+    .select()
+    .from(schema.eventLog)
+    .where(and(eq(schema.eventLog.subjectId, issueId), eq(schema.eventLog.kind, kind)));
+}
+
 function callCreate(
   body: unknown,
   env: ReturnType<typeof testEnv>,
@@ -153,9 +165,20 @@ describe("handleCreate (POST /api/issues/create)", () => {
       expect(issue?.status).toBe("draft");
       expect(issue?.wardId).toBe(VALID_WARD_ID);
       expect(issue?.createdBy).toBe(memberId);
+
+      // B5 — Issue Timeline (issue #28): creating a draft fires exactly one
+      // event_log row of kind "issue_created", attributed to the creator.
+      const events = await getEventLogRows(issueId, "issue_created");
+      expect(events).toHaveLength(1);
+      expect(events[0]?.actorMemberId).toBe(memberId);
     } finally {
       if (issueId) await deleteIssue(issueId);
-      await deleteMember(memberId);
+      // Deliberately does NOT delete memberId: the successful create above
+      // inserted an event_log row with actorMemberId = memberId, and
+      // event_log's FK to members is ON DELETE NO ACTION (append-only —
+      // packages/db/src/schema.ts) — deleting the member row would now fail
+      // with a foreign-key violation. Same reasoning in the two tests below
+      // (matches the established pattern in flag-routing.test.ts).
     }
   });
 
@@ -170,7 +193,8 @@ describe("handleCreate (POST /api/issues/create)", () => {
       issueId = body.issueId;
     } finally {
       if (issueId) await deleteIssue(issueId);
-      await deleteMember(memberId);
+      // memberId is NOT deleted — it's now referenced by an event_log row's
+      // actorMemberId (append-only FK, see above).
     }
   });
 
@@ -189,7 +213,9 @@ describe("handleCreate (POST /api/issues/create)", () => {
       expect(await second.json()).toEqual({ error: "rate_limited" });
     } finally {
       if (firstIssueId) await deleteIssue(firstIssueId);
-      await deleteMember(memberId);
+      // memberId is NOT deleted — the first (successful) call inserted an
+      // event_log row with actorMemberId = memberId (append-only FK, see
+      // above).
     }
   });
 });

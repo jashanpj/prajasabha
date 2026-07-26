@@ -105,6 +105,16 @@ export async function handleMerge(
       .update(schema.issues)
       .set({ status: "merged", mergedInto: targetIssueId })
       .where(eq(schema.issues.issueId, issueId));
+
+    // B5 — Issue Timeline (issue #28). No member session exists on this
+    // internal-ops-only endpoint, so no actorMemberId (system-triggered,
+    // same precedent as #27's promotion event).
+    await tx.insert(schema.eventLog).values({
+      kind: "issue_merged",
+      subjectType: "issue",
+      subjectId: issueId,
+      payload: { targetIssueId },
+    });
   });
 
   return Response.json({ ok: true }, { status: 200 });

@@ -113,6 +113,18 @@ async function getIssue(issueId: string) {
   return row;
 }
 
+// B5 — Issue Timeline (issue #28). event_log is append-only (no DELETE
+// grant to any role, CLAUDE.md invariant 3) — cleanup never touches
+// event_log rows, only the member/issue rows, matching this file's existing
+// convention.
+async function getEventLogRows(issueId: string, kind: string) {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  return db
+    .select()
+    .from(schema.eventLog)
+    .where(and(eq(schema.eventLog.subjectId, issueId), eq(schema.eventLog.kind, kind)));
+}
+
 async function getIssueSupportRowsFor(issueIds: string[], memberId: string) {
   const db = getServiceRoleDb(appDatabaseUrl());
   return db
@@ -306,6 +318,15 @@ describe("handleMerge (POST /api/admin/issues/:issueId/merge)", () => {
       // (re-pointed from source), memberC (pre-existing on target) = 3
       // unique supporters — NOT 4 (memberA must not be double-counted).
       expect(targetAfter?.supportT2Count).toBe(3);
+
+      // B5 — Issue Timeline (issue #28): merging fires exactly one
+      // event_log row of kind "issue_merged" on the SOURCE issue, with
+      // payload.targetIssueId pointing at the target. No actorMemberId —
+      // this endpoint has no member session.
+      const events = await getEventLogRows(sourceId, "issue_merged");
+      expect(events).toHaveLength(1);
+      expect(events[0]?.payload).toMatchObject({ targetIssueId: targetId });
+      expect(events[0]?.actorMemberId).toBeNull();
     } finally {
       if (sourceId && targetId) await deleteIssueSupportFor([sourceId, targetId]);
       if (sourceId) await deleteIssue(sourceId);

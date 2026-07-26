@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { schema } from "db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { signSession } from "shared";
 import { describe, expect, it } from "vitest";
 import { getServiceRoleDb } from "../../../../lib/db";
@@ -177,6 +177,17 @@ async function getIssue(issueId: string) {
   return row;
 }
 
+// B5 — Issue Timeline (issue #28). event_log is append-only (no DELETE
+// grant to any role) — cleanup never touches event_log rows, only the
+// member/issue rows, matching this repo's existing convention.
+async function getEventLogRows(issueId: string, kind: string) {
+  const db = getServiceRoleDb(appDatabaseUrl());
+  return db
+    .select()
+    .from(schema.eventLog)
+    .where(and(eq(schema.eventLog.subjectId, issueId), eq(schema.eventLog.kind, kind)));
+}
+
 function callPublish(
   env: ReturnType<typeof testEnv>,
   issueId: string,
@@ -309,9 +320,20 @@ describe("handlePublish (POST /api/issues/:issueId/publish)", () => {
       const issue = await getIssue(issueId);
       expect(issue?.status).toBe("published");
       expect(issue?.slug).toBe(responseBody.slug);
+
+      // B5 — Issue Timeline (issue #28): publishing fires exactly one
+      // event_log row of kind "issue_published".
+      const events = await getEventLogRows(issueId, "issue_published");
+      expect(events).toHaveLength(1);
     } finally {
       if (issueId) await deleteIssue(issueId);
-      await deleteMember(memberId);
+      // Deliberately does NOT delete memberId: the successful publish above
+      // inserted an event_log row with actorMemberId = memberId, and
+      // event_log's FK to members is ON DELETE NO ACTION (append-only —
+      // packages/db/src/schema.ts) — deleting the member row would now fail
+      // with a foreign-key violation. Same reasoning in every other
+      // "publishes successfully" test below (matches the established
+      // pattern in flag-routing.test.ts).
     }
   });
 
@@ -333,7 +355,8 @@ describe("handlePublish (POST /api/issues/:issueId/publish)", () => {
     } finally {
       if (issueIdA) await deleteIssue(issueIdA);
       if (issueIdB) await deleteIssue(issueIdB);
-      await deleteMember(memberId);
+      // memberId is NOT deleted — both publishes above inserted event_log
+      // rows referencing it as actorMemberId (append-only FK, see above).
     }
   });
 
@@ -356,7 +379,9 @@ describe("handlePublish (POST /api/issues/:issueId/publish)", () => {
     } finally {
       if (issueIdA) await deleteIssue(issueIdA);
       if (issueIdB) await deleteIssue(issueIdB);
-      await deleteMember(memberId);
+      // memberId is NOT deleted — the first (successful) publish inserted an
+      // event_log row referencing it as actorMemberId (append-only FK, see
+      // above).
     }
   });
 
@@ -392,7 +417,9 @@ describe("handlePublish (POST /api/issues/:issueId/publish)", () => {
       expect(routings[0]?.role).toBe("responsible");
     } finally {
       if (issueId) await deleteIssue(issueId);
-      await deleteMember(memberId);
+      // memberId is NOT deleted — the successful publish inserted an
+      // event_log row referencing it as actorMemberId (append-only FK, see
+      // above).
       await cleanupAuthority(authorityId);
     }
   });
@@ -418,7 +445,9 @@ describe("handlePublish (POST /api/issues/:issueId/publish)", () => {
       expect(routings).toEqual([]);
     } finally {
       if (issueId) await deleteIssue(issueId);
-      await deleteMember(memberId);
+      // memberId is NOT deleted — the successful publish inserted an
+      // event_log row referencing it as actorMemberId (append-only FK, see
+      // above).
     }
   });
 });

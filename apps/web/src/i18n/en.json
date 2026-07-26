@@ -104,5 +104,11 @@
   "issue.detail.support.error.rate_limited": "You've hit the hourly limit for this action. Please try again later.",
   "issue.detail.support.error.generic": "Something went wrong. Please try again.",
   "issue.merged.attribution": "Raised by {count} constituents, merged into another issue.",
-  "issue.merged.viewLink": "View the active issue"
+  "issue.merged.viewLink": "View the active issue",
+  "issue.timeline.title": "Timeline",
+  "issue.timeline.kind.issue_created": "Issue created",
+  "issue.timeline.kind.issue_published": "Published",
+  "issue.timeline.kind.issue_promoted_to_concern": "Promoted to Constituency Concern",
+  "issue.timeline.kind.issue_merged": "Merged into another issue",
+  "issue.timeline.kind.issue_routing_flagged": "Routing flagged for review"
 }
