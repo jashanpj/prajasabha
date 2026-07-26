@@ -14,6 +14,7 @@
 // file as the CREATE TABLE statements, per CLAUDE.md invariant 4.
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   customType,
   index,
   integer,
@@ -59,6 +60,15 @@ export const members = pgTable("members", {
   constituencyId: uuid("constituency_id"),
   wardId: uuid("ward_id"),
   locale: localeEnum("locale").notNull().default("ml"),
+  // Added in migration 0003 (issue #22's A3 EPIC/T2 verification). The
+  // pilot targets a single Lok Sabha constituency, so — unlike
+  // constituencyId/wardId above — there is no constituencies/wards lookup
+  // table to FK against; assemblySegment is the reviewer-confirmed segment
+  // name, and coverage is checked against a config-driven allow-list
+  // (packages/shared's loadEpicVerificationConfig), same pattern as
+  // concernThresholdT2. Both nullable: unset until a T2 approval happens.
+  assemblySegment: text("assembly_segment"),
+  assemblySegmentCovered: boolean("assembly_segment_covered"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

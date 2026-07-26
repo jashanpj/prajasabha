@@ -24,8 +24,9 @@ export function requireInternalToken(expectedToken: string): MiddlewareHandler {
 // Manual constant-time compare (no Node crypto.timingSafeEqual dependency,
 // so this runs the same way in Workers without nodejs_compat). Always
 // walks the full length of the longer string so an attacker can't learn
-// the token length from response timing either.
-function timingSafeEqual(a: string, b: string): boolean {
+// the token length from response timing either. Exported for review-auth.ts's
+// requireReviewAccess, which needs the identical bearer-token comparison.
+export function timingSafeEqual(a: string, b: string): boolean {
   const maxLength = Math.max(a.length, b.length);
   let diff = a.length === b.length ? 0 : 1;
   for (let i = 0; i < maxLength; i++) {

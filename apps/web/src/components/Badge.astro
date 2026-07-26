@@ -8,10 +8,15 @@
 export interface Props {
   tier: "t1" | "t2";
   ward?: string;
+  // Locale-appropriate label, required from any caller that renders in a
+  // non-English locale (Malayalam is the default — CLAUDE.md) since this
+  // component has no i18n dict of its own to look up from. Falls back to
+  // the English default only for callers that haven't been localized yet.
+  label?: string;
   class?: string;
 }
 
-const { tier, ward, class: className } = Astro.props;
+const { tier, ward, label: labelOverride, class: className } = Astro.props;
 
 if (tier === "t2" && !ward) {
   throw new Error(
@@ -19,7 +24,8 @@ if (tier === "t2" && !ward) {
   );
 }
 
-const label = tier === "t1" ? "Verified Citizen" : `Verified Constituent — ${ward}`;
+const label =
+  labelOverride ?? (tier === "t1" ? "Verified Citizen" : `Verified Constituent — ${ward}`);
 ---
 
 <span class:list={["ps-badge", `ps-badge--${tier}`, className]} data-testid="ps-badge">

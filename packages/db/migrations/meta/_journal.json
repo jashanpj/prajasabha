@@ -22,6 +22,13 @@
       "when": 1785013843700,
       "tag": "0002_grant_app_role_service_role",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785049288852,
+      "tag": "0003_add_member_assembly_segment",
+      "breakpoints": true
     }
   ]
 }

@@ -89,3 +89,57 @@ describe("vault.auth_credentials RLS", () => {
     });
   });
 });
+
+describe("vault.epic_verifications RLS", () => {
+  it("vault_role can INSERT, SELECT, and UPDATE its own rows", async () => {
+    const id = await withRole(vaultDatabaseUrl, "vault_role", async (client) => {
+      const insertResult = await client.query<{ verification_id: string }>(
+        `INSERT INTO vault.epic_verifications
+           (epic_number_hash, epic_number_ciphertext, epic_number_iv, doc_ciphertext, doc_iv, assembly_segment_claimed)
+         VALUES ($1, 'ciphertext', 'iv', 'doc-ciphertext', 'doc-iv', 'Some Assembly Segment')
+         RETURNING verification_id`,
+        [`hash-${randomUUID()}`],
+      );
+      return insertResult.rows[0]?.verification_id;
+    });
+    expect(id).toBeDefined();
+
+    await withRole(vaultDatabaseUrl, "vault_role", async (client) => {
+      const selectResult = await client.query(
+        "SELECT * FROM vault.epic_verifications WHERE verification_id = $1",
+        [id],
+      );
+      expect(selectResult.rows).toHaveLength(1);
+
+      const updateResult = await client.query(
+        "UPDATE vault.epic_verifications SET status = 'approved', reviewed_at = now() WHERE verification_id = $1 RETURNING status",
+        [id],
+      );
+      expect(updateResult.rows[0]?.status).toBe("approved");
+    });
+  });
+
+  it("a role with no grant on the vault schema cannot SELECT epic_verifications", async () => {
+    await withSuperuser(async (client) => {
+      await client.query(`SET ROLE "${noAccessRole}"`);
+      await expect(client.query("SELECT * FROM vault.epic_verifications LIMIT 1")).rejects.toThrow(
+        /permission denied/,
+      );
+      await client.query("RESET ROLE");
+    });
+  });
+
+  it("a role with no grant on the vault schema cannot INSERT into epic_verifications", async () => {
+    await withSuperuser(async (client) => {
+      await client.query(`SET ROLE "${noAccessRole}"`);
+      await expect(
+        client.query(
+          `INSERT INTO vault.epic_verifications
+             (epic_number_hash, epic_number_ciphertext, epic_number_iv, doc_ciphertext, doc_iv, assembly_segment_claimed)
+           VALUES ('x', 'x', 'x', 'x', 'x', 'x')`,
+        ),
+      ).rejects.toThrow(/permission denied/);
+      await client.query("RESET ROLE");
+    });
+  });
+});

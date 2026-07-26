@@ -4,6 +4,7 @@ import { loadMagicLinkConfig } from "shared";
 import { createVaultDbClient, encryptEmail, hashEmail, schema } from "vault-db";
 import { requireInternalToken } from "./auth";
 import type { Bindings } from "./env";
+import { registerEpicRoutes } from "./epic";
 
 // Internal-only routes (issue #20): called exclusively by apps/web via a
 // Cloudflare service binding (env.VAULT_SVC), never a public URL. This is
@@ -14,6 +15,12 @@ const app = new Hono<{ Bindings: Bindings }>();
 app.use("/internal/*", async (c, next) =>
   requireInternalToken(c.env.VAULT_SVC_INTERNAL_TOKEN)(c, next),
 );
+
+// Issue #16/#22 — A3 EPIC verification (/public/epic/*, /internal/epic/*,
+// /review/epic/*). Registered onto this same app instance so the
+// "/internal/*" middleware above already covers /internal/epic/* — see
+// epic.ts for /review/epic/*'s own, separate requireReviewAccess gate.
+registerEpicRoutes(app);
 
 async function hashToken(rawToken: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawToken));
