@@ -1,0 +1,399 @@
+---
+import AuthorityChip from "../../components/AuthorityChip.astro";
+import Button from "../../components/Button.astro";
+import SiteChrome from "../../components/SiteChrome.astro";
+import "../../styles/global.css";
+import { schema } from "db";
+import { eq } from "drizzle-orm";
+import { verifySession } from "shared";
+import en from "../../i18n/en.json";
+import ml from "../../i18n/ml.json";
+import { getServiceRoleDb } from "../../lib/db";
+import { listIssues, parseIssueFilters } from "../../lib/issue-list";
+
+// B6 — public issue browse (issue #105). The `/issues` index the Product
+// Spec requires and the dashboard links to; before this the route 404'd.
+//
+// Public and guest-browsable: no session needed to read, matching
+// [slug].astro's posture and the issues_public_read RLS policy. The
+// filter/visibility logic lives in ../../lib/issue-list.ts so it can be
+// unit-tested (no vitest test can render an .astro page here — see
+// apps/web/vitest.config.ts) — in particular the guard that no `?status=`
+// value can surface a draft through this service_role connection.
+//
+// Zero client JS: the filter form is a plain GET <form> of native
+// <select>s, so filter state lives in the URL and survives sharing, the
+// back button, and the EN/ML toggle. A hydrated island here would be the
+// first client bundle in the app and would start eating the 50KB budget
+// scripts/check-bundle-budget.mjs enforces.
+const locale = Astro.url.searchParams.get("lang") === "en" ? "en" : "ml";
+const t: Record<string, string> = locale === "en" ? en : ml;
+
+// Same DEV-fallback pattern as issues/new.astro: placeholder values
+// mirroring .env.example for `astro dev`, real config from
+// cloudflare:workers everywhere else.
+const DEV_CATEGORIES = ["roads", "water", "electricity", "waste", "streetlight", "other"];
+const DEV_WARDS = [
+  { id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", nameMl: "ടെസ്റ്റ് വാർഡ് 1", nameEn: "Test Ward 1" },
+  { id: "5b1b6e1e-1c1a-4e1a-9c1a-2c963f66afa6", nameMl: "ടെസ്റ്റ് വാർഡ് 2", nameEn: "Test Ward 2" },
+];
+
+const env = import.meta.env.DEV ? undefined : (await import("cloudflare:workers")).env;
+let categories = DEV_CATEGORIES;
+let wards = DEV_WARDS;
+if (!import.meta.env.DEV) {
+  const { loadIssueCategoriesConfig, loadPilotWardsConfig } = await import("shared");
+  const configEnv = env as unknown as Record<string, string | undefined>;
+  categories = loadIssueCategoriesConfig(configEnv).issueCategories;
+  wards = loadPilotWardsConfig(configEnv).pilotWards;
+}
+
+const appDatabaseUrl = import.meta.env.DEV
+  ? "postgres://app_role:app_role_dev_only@localhost:5432/prajasabha_dev"
+  : env?.APP_DATABASE_URL;
+const sessionSecret = import.meta.env.DEV
+  ? "local-dev-session-secret-do-not-use-in-prod"
+  : env?.SESSION_SECRET;
+
+const db = getServiceRoleDb(appDatabaseUrl as string);
+
+// Tier gates the "Raise an issue" action only — never what's listed.
+const sessionCookieValue = Astro.cookies.get("ps_session")?.value;
+const session =
+  sessionCookieValue && sessionSecret
+    ? await verifySession(sessionCookieValue, sessionSecret)
+    : null;
+let tier: "t0" | "t1" | "t2" | null = null;
+if (session) {
+  const [member] = await db
+    .select({ tier: schema.members.tier })
+    .from(schema.members)
+    .where(eq(schema.members.memberId, session.memberId))
+    .limit(1);
+  tier = member?.tier ?? null;
+}
+// Matches /api/issues/create.ts's own authz (it rejects only t0), so a T1
+// member isn't shown a disabled button for something the endpoint would
+// accept. The endpoint remains the enforcement point — this only decides
+// what the page offers.
+const canParticipate = tier === "t1" || tier === "t2";
+
+const PAGE_SIZE = 20;
+const filters = parseIssueFilters(Astro.url.searchParams, {
+  wardIds: wards.map((ward) => ward.id),
+  categories,
+});
+// Unvalidated on purpose: listIssues clamps `page` to [1, pageCount]
+// against the real total, which is what keeps a hostile ?page= from
+// overflowing the OFFSET or forcing a deep scan.
+const requestedPage = Number.parseInt(Astro.url.searchParams.get("page") ?? "1", 10);
+
+const {
+  rows,
+  total,
+  page: currentPage,
+  pageCount,
+} = await listIssues(db, filters, {
+  limit: PAGE_SIZE,
+  page: requestedPage,
+});
+
+const numberFormat = new Intl.NumberFormat(locale === "en" ? "en-IN" : "ml-IN");
+
+const categoryLabel = (code: string): string => t[`issue.category.${code}`] ?? code;
+const wardLabel = (ward: (typeof wards)[number]): string =>
+  locale === "en" ? ward.nameEn : ward.nameMl;
+const issueTitle = (row: (typeof rows)[number]): string =>
+  locale === "en" ? row.titleEn : row.titleMl;
+const authorityName = (authority: { nameMl: string; nameEn: string }): string =>
+  locale === "en" ? authority.nameEn : authority.nameMl;
+
+const STATUS_OPTIONS = [
+  { value: "all", labelKey: "issues.filter.status.all" },
+  { value: "concern", labelKey: "issues.filter.status.concern" },
+  { value: "open", labelKey: "issues.filter.status.open" },
+] as const;
+
+// Page links must carry the active filters and locale, or paging silently
+// resets the view.
+function pageHref(page: number): string {
+  const params = new URLSearchParams();
+  params.set("lang", locale);
+  if (filters.ward) params.set("ward", filters.ward);
+  if (filters.category) params.set("category", filters.category);
+  if (filters.status !== "all") params.set("status", filters.status);
+  if (page > 1) params.set("page", `${page}`);
+  return `/issues?${params.toString()}`;
+}
+---
+
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{t["issues.title"]}</title>
+  </head>
+  <body>
+    <SiteChrome locale={locale}>
+      <div class="ps-issues">
+        <div class="ps-issues__header">
+          <div>
+            <h1>{t["issues.title"]}</h1>
+            <p class="ps-issues__count">
+              {t["issues.count"].replace("{count}", numberFormat.format(total))}
+            </p>
+          </div>
+          {
+            canParticipate ? (
+              <Button href={`/issues/new?lang=${locale}`}>{t["issues.raiseIssue"]}</Button>
+            ) : (
+              <div class="ps-issues__gate">
+                <Button disabled>{t["issues.raiseIssue"]}</Button>
+                <p class="ps-issues__gate-note">
+                  <a href={`${session ? "/verify/epic" : "/register"}?lang=${locale}`}>
+                    {t["nav.cta.verify"]}
+                  </a>
+                  {" — "}
+                  {t["issues.guestNote"]}
+                </p>
+              </div>
+            )
+          }
+        </div>
+
+        <form method="get" action="/issues" class="ps-issues__filters">
+          <input type="hidden" name="lang" value={locale} />
+          <div class="ps-field">
+            <label for="filter-ward">{t["issues.filter.ward"]}</label>
+            <select id="filter-ward" name="ward">
+              <option value="">{t["issues.filter.ward.any"]}</option>
+              {
+                wards.map((ward) => (
+                  <option value={ward.id} selected={filters.ward === ward.id}>
+                    {wardLabel(ward)}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+          <div class="ps-field">
+            <label for="filter-category">{t["issues.filter.category"]}</label>
+            <select id="filter-category" name="category">
+              <option value="">{t["issues.filter.category.any"]}</option>
+              {
+                categories.map((code) => (
+                  <option value={code} selected={filters.category === code}>
+                    {categoryLabel(code)}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+          <div class="ps-field">
+            <label for="filter-status">{t["issues.filter.status"]}</label>
+            <select id="filter-status" name="status">
+              {
+                STATUS_OPTIONS.map((option) => (
+                  <option value={option.value} selected={filters.status === option.value}>
+                    {t[option.labelKey]}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+          <Button type="submit" variant="secondary">{t["issues.filter.apply"]}</Button>
+        </form>
+
+        {
+          rows.length === 0 ? (
+            <p class="ps-issues__empty">{t["issues.empty"]}</p>
+          ) : (
+            <ul class="ps-issues__list">
+              {rows.map((row) => (
+                <li>
+                  <a href={`/issues/${row.slug}?lang=${locale}`} class="ps-issues__row">
+                    <span class="ps-issues__body">
+                      <span class="ps-issues__row-title">{issueTitle(row)}</span>
+                      <span class="ps-issues__meta">
+                        <span class="ps-issues__category">{categoryLabel(row.category)}</span>
+                        <span class="ps-issues__support tabular-nums">
+                          {t["dashboard.concerns.supportCount"].replace(
+                            "{count}",
+                            numberFormat.format(row.supportT2Count),
+                          )}
+                        </span>
+                        {row.responsibleAuthority && (
+                          <AuthorityChip
+                            role="responsible"
+                            authorityName={authorityName(row.responsibleAuthority)}
+                            roleLabel={t["issue.routing.role.responsible"]}
+                          />
+                        )}
+                      </span>
+                    </span>
+                    <span class="ps-issues__arrow" aria-hidden="true">
+                      →
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+
+        {
+          pageCount > 1 && (
+            <nav class="ps-issues__pagination" aria-label={t["issues.pagination.label"]}>
+              {currentPage > 1 && <a href={pageHref(currentPage - 1)}>{t["issues.pagination.previous"]}</a>}
+              <span class="tabular-nums">
+                {t["issues.pagination.position"]
+                  .replace("{page}", numberFormat.format(currentPage))
+                  .replace("{pageCount}", numberFormat.format(pageCount))}
+              </span>
+              {currentPage < pageCount && <a href={pageHref(currentPage + 1)}>{t["issues.pagination.next"]}</a>}
+            </nav>
+          )
+        }
+      </div>
+    </SiteChrome>
+  </body>
+</html>
+
+<style>
+  .ps-issues {
+    padding: 1.5em;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25em;
+  }
+  .ps-issues__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1em;
+    flex-wrap: wrap;
+  }
+  .ps-issues__header h1 {
+    font-family: var(--font-family-heading);
+    font-weight: var(--font-weight-heading);
+    font-size: var(--font-size-display);
+    color: var(--color-navy);
+    margin: 0;
+  }
+  .ps-issues__count {
+    color: var(--color-muted);
+    font-size: var(--font-size-caption);
+    margin: 0.2em 0 0;
+  }
+  .ps-issues__gate {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35em;
+  }
+  .ps-issues__gate-note {
+    color: var(--color-muted);
+    font-size: var(--font-size-caption);
+    margin: 0;
+  }
+  .ps-issues__gate-note a {
+    color: var(--color-navy);
+    font-weight: 600;
+  }
+  .ps-issues__filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75em;
+    flex-wrap: wrap;
+    background: var(--color-card-fill);
+    border: 1px solid var(--color-card-border);
+    border-radius: var(--radius-card);
+    padding: 1em 1.25em;
+  }
+  .ps-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+  }
+  .ps-field label {
+    font-size: var(--font-size-caption);
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+  .ps-field select {
+    font: inherit;
+    padding: 0.5em 0.6em;
+    border: 1px solid var(--color-card-border);
+    border-radius: var(--radius-button);
+    background: var(--color-ivory);
+    color: var(--color-charcoal);
+  }
+  .ps-issues__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--color-card-border);
+    border-radius: var(--radius-card);
+    background: var(--color-card-fill);
+    overflow: hidden;
+  }
+  .ps-issues__row {
+    display: flex;
+    align-items: center;
+    gap: 0.9em;
+    padding: 1em 1.25em;
+    border-bottom: 1px solid var(--color-card-border);
+    text-decoration: none;
+    color: inherit;
+  }
+  .ps-issues__list li:last-child .ps-issues__row {
+    border-bottom: none;
+  }
+  .ps-issues__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+    min-width: 0;
+  }
+  .ps-issues__row-title {
+    font-weight: 600;
+    font-size: var(--font-size-body);
+    color: var(--color-charcoal);
+  }
+  .ps-issues__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    flex-wrap: wrap;
+  }
+  .ps-issues__category {
+    color: var(--color-muted);
+    font-size: var(--font-size-caption);
+  }
+  .ps-issues__support {
+    color: var(--color-green);
+    font-weight: 600;
+    font-size: var(--font-size-caption);
+  }
+  .ps-issues__arrow {
+    color: var(--color-disabled);
+    flex-shrink: 0;
+  }
+  .ps-issues__empty {
+    color: var(--color-muted);
+    margin: 0;
+  }
+  .ps-issues__pagination {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    color: var(--color-muted);
+    font-size: var(--font-size-caption);
+  }
+  .ps-issues__pagination a {
+    color: var(--color-navy);
+    font-weight: 600;
+    text-decoration: none;
+  }
+</style>

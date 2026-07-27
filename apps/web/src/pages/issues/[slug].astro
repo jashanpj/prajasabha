@@ -289,6 +289,32 @@ function timelineTimestamp(at: Date): string {
     timeStyle: "short",
   });
 }
+
+// #103 — the attribution caption for a standard (non-merged) issue, which
+// this page never rendered: only the `merged` branch below had one, so the
+// common `published` case showed title + category + body and nothing else.
+// `issues` has no created_at column, so the date comes from the
+// append-only event_log rows already fetched for B5's timeline above — no
+// extra query, no migration.
+//
+// Worded "Published", not the design package's "Sent {date}": "sent"
+// denotes transmission to an authority, which is Module E
+// (tx_status_events) and does not exist yet. Using it would assert
+// something untrue about the issue's state. Falls back to the count alone
+// rather than inventing a date if no issue_published event exists.
+const publishedAt = timelineRows.find((row) => row.kind === "issue_published")?.at ?? null;
+function attributionLine(): string {
+  const count = numberFormat.format(issue.supportT2Count);
+  if (!publishedAt) {
+    return t["issue.attribution.countOnly"].replace("{count}", count);
+  }
+  return t["issue.attribution.published"]
+    .replace(
+      "{date}",
+      publishedAt.toLocaleDateString(locale === "en" ? "en-IN" : "ml-IN", { dateStyle: "medium" }),
+    )
+    .replace("{count}", count);
+}
 ---
 
 <html lang={locale}>
@@ -310,6 +336,9 @@ function timelineTimestamp(at: Date): string {
           <div class="ps-card">
             <h1>{title}</h1>
             <p class="ps-issue-category">{categoryLabel}</p>
+            {issue.status === "published" && (
+              <p class="ps-issue-attribution">{attributionLine()}</p>
+            )}
             <p class="ps-issue-body">{issue.body}</p>
 
             {issue.status === "merged" && (
@@ -771,6 +800,13 @@ function timelineTimestamp(at: Date): string {
       .ps-breadcrumb a {
         color: var(--color-navy);
         text-decoration: none;
+      }
+      /* #103 — attribution caption sits directly under the title/category,
+         in the same muted caption treatment as the breadcrumb above. */
+      .ps-issue-attribution {
+        color: var(--color-muted);
+        font-size: var(--font-size-caption);
+        margin: 0.35em 0 0;
       }
       .ps-issue-layout {
         display: grid;

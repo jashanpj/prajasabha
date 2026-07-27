@@ -12,6 +12,13 @@
 // its own env/session lookups already (same posture as verify/epic.astro,
 // issues/[slug].astro, etc.).
 //
+// Nav link set (issue #102): #88's own AC was "Home, and whichever of
+// Dashboard/Raise an issue have landed", but only Home and Dashboard were
+// ever wired up — issues/new.astro had already shipped (#24) and stayed
+// unreachable from the chrome. Both it and the /issues index (#105) are
+// linked here now. The responsive/mobile bottom-bar contract is #106 and
+// deliberately not attempted here.
+//
 // Wordmark text is APP_NAME ("PrajaSabha"), not the design package's
 // "Praja" — the mismatch is an open product decision tracked under #71,
 // not something to resolve unilaterally from this component. The footer
@@ -90,6 +97,13 @@ const mlHref = `${currentPath}?lang=ml`;
       <a
         href={withLang("/dashboard")}
         aria-current={currentPath === "/dashboard" ? "page" : undefined}>{t["nav.dashboard"]}</a
+      >
+      <a href={withLang("/issues")} aria-current={currentPath === "/issues" ? "page" : undefined}
+        >{t["nav.issues"]}</a
+      >
+      <a
+        href={withLang("/issues/new")}
+        aria-current={currentPath === "/issues/new" ? "page" : undefined}>{t["nav.raiseIssue"]}</a
       >
     </div>
     <div class="ps-nav__right">
