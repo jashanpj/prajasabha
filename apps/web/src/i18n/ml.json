@@ -165,6 +165,8 @@
   "issue.detail.support.error.already_supported": "നിങ്ങൾ ഇതിനകം ഈ പ്രശ്നത്തെ പിന്തുണച്ചിട്ടുണ്ട്.",
   "issue.detail.support.error.rate_limited": "ഈ പ്രവർത്തനത്തിനുള്ള മണിക്കൂർ പരിധി കഴിഞ്ഞു. അൽപ്പസമയം കഴിഞ്ഞ് വീണ്ടും ശ്രമിക്കുക.",
   "issue.detail.support.error.generic": "എന്തോ പിഴവ് സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക.",
+  "issue.attribution.published": "{date}-ന് പ്രസിദ്ധീകരിച്ചു · {count} നിവാസികൾ ഉന്നയിച്ചത്",
+  "issue.attribution.countOnly": "{count} നിവാസികൾ ഉന്നയിച്ചത്",
   "issue.merged.attribution": "{count} നിവാസികൾ ഉന്നയിച്ചത്, മറ്റൊരു പ്രശ്നത്തിലേക്ക് ലയിപ്പിച്ചു.",
   "issue.merged.viewLink": "സജീവമായ പ്രശ്നം കാണുക",
   "issue.timeline.title": "സമയരേഖ",
