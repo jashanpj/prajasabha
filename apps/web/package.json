@@ -7,7 +7,10 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy:dev": "CLOUDFLARE_ENV= astro build && CLOUDFLARE_ENV= wrangler deploy",
+    "deploy:staging": "CLOUDFLARE_ENV=staging astro build && wrangler deploy --env staging",
+    "deploy:production": "CLOUDFLARE_ENV=production astro build && wrangler deploy --env production"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^13.7.0",

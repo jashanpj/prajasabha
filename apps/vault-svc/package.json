@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "wrangler dev",
     "build": "wrangler deploy --dry-run --outdir dist",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy:dev": "CLOUDFLARE_ENV= wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
