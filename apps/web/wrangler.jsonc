@@ -1,6 +1,17 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "prajasabha-web",
+  // Issue #18 — top level is the DEV environment on purpose, so that a
+  // deploy which names no environment lands on a throwaway dev Worker rather
+  // than the live site. staging and production are both explicit --env
+  // targets.
+  //
+  // This is a safe DEFAULT, not a guarantee: wrangler resolves the target as
+  // `--env ?? process.env.CLOUDFLARE_ENV`, so an ambient
+  // CLOUDFLARE_ENV=production makes a bare `wrangler deploy` publish
+  // production. The `deploy:*` scripts in package.json pin CLOUDFLARE_ENV
+  // explicitly for exactly that reason — prefer them over raw wrangler.
+  // See docs/deploy.md.
+  "name": "prajasabha-web-dev",
   "compatibility_date": "2025-01-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -9,32 +20,82 @@
   },
   // Issue #20 — A1 registration. RATE_LIMIT_KV needs a real namespace id
   // per environment (`wrangler kv namespace create RATE_LIMIT_KV`) before
-  // deploying — "local-dev-placeholder" only works for `wrangler dev`'s
-  // local KV emulation. VAULT_SVC is a service binding to apps/vault-svc —
-  // the only way this Worker reaches the identity vault, never a direct
-  // packages/vault-db import (CLAUDE.md invariant 2).
-  "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "local-dev-placeholder" }],
+  // deploying — "web-local-dev-placeholder" only works for `wrangler dev`'s
+  // local KV emulation, and the per-env ids below are deliberately invalid
+  // placeholders so a premature deploy fails loudly instead of silently
+  // binding to whatever namespace exists. VAULT_SVC is a service binding to
+  // apps/vault-svc — the only way this Worker reaches the identity vault,
+  // never a direct packages/vault-db import (CLAUDE.md invariant 2).
+  "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "web-local-dev-placeholder" }],
   // Issue #35 — C3's demo-only manual sweep trigger
   // (POST /api/admin/deliberations/sweep) calls apps/jobs over this
   // binding, same cross-Worker pattern as VAULT_SVC above.
+  //
+  // Service bindings target a Worker by NAME, so each environment must point
+  // at that environment's Worker. Getting this wrong is precisely how a
+  // staging deploy would end up talking to the production identity vault —
+  // the names below must stay in lockstep with apps/vault-svc's and
+  // apps/jobs' own per-env `name` fields.
   "services": [
-    { "binding": "VAULT_SVC", "service": "prajasabha-vault-svc" },
-    { "binding": "JOBS_SVC", "service": "prajasabha-jobs" }
+    { "binding": "VAULT_SVC", "service": "prajasabha-vault-svc-dev" },
+    { "binding": "JOBS_SVC", "service": "prajasabha-jobs-dev" }
   ],
   // Issue #24 — B1 evidence photos. EXIF/GPS-stripped bytes only (the
   // photos endpoint strips before put); keys are indexed in
   // issues.photo_keys. Needs a real bucket per environment
-  // (`wrangler r2 bucket create prajasabha-issue-photos`) before deploying
-  // — local `wrangler dev` emulates it.
+  // (`wrangler r2 bucket create <name>`) before deploying — local
+  // `wrangler dev` emulates it.
   // Issue #34 — C2 consensus export (GET /api/issues/:issueId/consensus-
   // export) reads the same bucket apps/jobs' lifecycle sweep writes the
   // generated PDF into — a thin passthrough, never a write from this app.
+  // Buckets are per environment so staging can never read or overwrite
+  // production evidence photos, which are citizen-submitted material.
   "r2_buckets": [
-    { "binding": "ISSUE_PHOTOS", "bucket_name": "prajasabha-issue-photos" },
-    { "binding": "DELIBERATION_ARTIFACTS", "bucket_name": "prajasabha-deliberation-artifacts" }
-  ]
-  // Secrets (never committed — set via `wrangler secret put <NAME>` per
-  // environment, or a gitignored .env/.dev.vars locally): APP_DATABASE_URL,
+    { "binding": "ISSUE_PHOTOS", "bucket_name": "prajasabha-issue-photos-dev" },
+    { "binding": "DELIBERATION_ARTIFACTS", "bucket_name": "prajasabha-deliberation-artifacts-dev" }
+  ],
+  // Bindings (kv_namespaces, r2_buckets, services, vars) are
+  // NON-INHERITABLE: Wrangler does not fall back to the top-level value, so
+  // an env block that omits one deploys a Worker with that binding silently
+  // absent. Both envs below therefore re-declare all five bindings in full.
+  // `assets`, `compatibility_date`, `compatibility_flags` and `name` DO
+  // inherit — `name` is still set explicitly per env, because Wrangler would
+  // otherwise auto-suffix it into `prajasabha-web-dev-staging`.
+  "env": {
+    "staging": {
+      "name": "prajasabha-web-staging",
+      "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "REPLACE_WITH_WEB_STAGING_KV_ID" }],
+      "services": [
+        { "binding": "VAULT_SVC", "service": "prajasabha-vault-svc-staging" },
+        { "binding": "JOBS_SVC", "service": "prajasabha-jobs-staging" }
+      ],
+      "r2_buckets": [
+        { "binding": "ISSUE_PHOTOS", "bucket_name": "prajasabha-issue-photos-staging" },
+        {
+          "binding": "DELIBERATION_ARTIFACTS",
+          "bucket_name": "prajasabha-deliberation-artifacts-staging"
+        }
+      ]
+    },
+    "production": {
+      "name": "prajasabha-web-prod",
+      "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "REPLACE_WITH_WEB_PROD_KV_ID" }],
+      "services": [
+        { "binding": "VAULT_SVC", "service": "prajasabha-vault-svc-prod" },
+        { "binding": "JOBS_SVC", "service": "prajasabha-jobs-prod" }
+      ],
+      "r2_buckets": [
+        { "binding": "ISSUE_PHOTOS", "bucket_name": "prajasabha-issue-photos-prod" },
+        {
+          "binding": "DELIBERATION_ARTIFACTS",
+          "bucket_name": "prajasabha-deliberation-artifacts-prod"
+        }
+      ]
+    }
+  }
+  // Secrets (never committed — set via
+  // `wrangler secret put <NAME> --env staging|production`, or a gitignored
+  // .env/.dev.vars locally): APP_DATABASE_URL,
   // VAULT_SVC_INTERNAL_TOKEN, RESEND_API_KEY, TURNSTILE_SECRET_KEY,
   // TURNSTILE_SITE_KEY, SESSION_SECRET, MAGIC_LINK_TTL_MINUTES,
   // REGISTER_RATE_LIMIT_PER_EMAIL_PER_HOUR, REGISTER_RATE_LIMIT_PER_IP_PER_HOUR,
@@ -56,4 +117,9 @@
   // STATEMENT_MODERATION_ADMIN_TOKEN, STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST
   // (issue #33), CONSENSUS_AGREEMENT_THRESHOLD_PERCENT, CONSENSUS_MIN_VOTERS
   // (issue #34) — see .env.example.
+  //
+  // Secrets are per-environment and non-inheritable. No value may be reused
+  // across environments (#18's AC): SESSION_SECRET reuse would make a
+  // staging session cookie valid in production, and the admin/internal
+  // tokens must differ so a leaked staging token grants nothing in prod.
 }

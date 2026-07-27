@@ -1,11 +1,31 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "prajasabha-api",
+  // Issue #18 — top level is the DEV environment on purpose; a bare
+  // `wrangler deploy` targets top-level config and so can only ever hit a
+  // throwaway dev Worker. See docs/deploy.md.
+  "name": "prajasabha-api-dev",
   "main": "./src/index.ts",
   "compatibility_date": "2025-01-01",
   "compatibility_flags": ["nodejs_compat"],
+  // This Worker is a stub with no purpose yet, so it gets no public hostname
+  // in any environment. Both keys are needed and both are inheritable:
+  // `workers_dev` controls <name>.<subdomain>.workers.dev and `preview_urls`
+  // controls <version>-<name>.<subdomain>.workers.dev, which defaults to true
+  // and would otherwise expose the Worker regardless of `workers_dev`.
+  "workers_dev": false,
+  "preview_urls": false,
   "dev": {
     "port": 8787,
     "inspector_port": 19229
+  },
+  // This Worker is still a stub (src/index.ts is a placeholder handler) and
+  // has no bindings, so these env blocks are name-only. They exist so the
+  // three-environment layout is uniform across apps/* — the alternative is
+  // discovering the gap the first time this Worker gains a binding. Add any
+  // future binding to ALL THREE environments: bindings are non-inheritable
+  // and an env that omits one deploys with it silently absent.
+  "env": {
+    "staging": { "name": "prajasabha-api-staging" },
+    "production": { "name": "prajasabha-api-prod" }
   }
 }

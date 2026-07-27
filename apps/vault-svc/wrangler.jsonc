@@ -1,6 +1,17 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "prajasabha-vault-svc",
+  // Issue #18 — the top level is the DEV environment, deliberately, so that a
+  // deploy which names no environment lands on a throwaway dev Worker rather
+  // than the production identity vault. staging and production are both
+  // explicit --env targets.
+  //
+  // A safe DEFAULT, not a guarantee: wrangler resolves the target as
+  // `--env ?? process.env.CLOUDFLARE_ENV`, so an ambient
+  // CLOUDFLARE_ENV=production makes a bare `wrangler deploy` publish
+  // production. The `deploy:*` scripts in package.json pin CLOUDFLARE_ENV
+  // explicitly for that reason — prefer them over raw wrangler.
+  // See docs/deploy.md.
+  "name": "prajasabha-vault-svc-dev",
   "main": "./src/index.ts",
   "compatibility_date": "2025-01-01",
   // Needed for packages/vault-db's `pg` (node-postgres) driver, same as
@@ -10,19 +21,66 @@
   // deploy-readiness follow-up, out of scope for this issue. Local dev
   // (docker-compose) and CI (Vitest, running in Node) are unaffected.
   "compatibility_flags": ["nodejs_compat"],
+  // Deliberately NOT `workers_dev: false`, unlike apps/jobs and apps/api.
+  // This Worker needs a real public origin: the browser posts the raw EPIC
+  // number and document straight to /public/epic/submit
+  // (apps/web/src/pages/verify/epic.astro's client script uses
+  // PUBLIC_VAULT_SVC_URL), which is HLD §4.3's "separate origin" rule — that
+  // data must never transit apps/web's server. Turning the subdomain off
+  // would silently break T2 verification.
+  //
+  // KNOWN HARDENING GAP (issue #18 security review, recorded in
+  // docs/deploy.md): that same public hostname also exposes
+  // /internal/registrations/* (bearer token only) and /review/epic/*
+  // (token + IP allowlist). The fix is a custom domain with an explicit
+  // `routes` entry per environment so only /public/* is publicly routable —
+  // deferred because it needs real zones/domains that do not exist yet.
+  // Do not "fix" this by setting workers_dev/preview_urls false; that breaks
+  // the EPIC flow above. Narrow it with routes instead.
   // Issue #22 — rate-limits /public/epic/submit, the one endpoint on this
   // Worker reachable with no service-to-service auth token (Turnstile
-  // only, same posture as apps/web's register/start.ts). Needs a real KV
-  // namespace id per environment before deploying, same as apps/web's own
-  // RATE_LIMIT_KV.
-  "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "local-dev-placeholder" }],
+  // only, same posture as apps/web's register/start.ts).
+  //
+  // `id` below is only valid for `wrangler dev`'s local KV emulation. The
+  // per-environment ids in `env` are deliberately invalid placeholders so a
+  // premature deploy fails loudly at config-validation rather than silently
+  // binding to whatever namespace happens to exist — fill them from
+  // `wrangler kv namespace create RATE_LIMIT_KV --env <env>` per
+  // docs/deploy.md's bootstrap checklist.
+  "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "vault-svc-local-dev-placeholder" }],
   "dev": {
     "port": 8789,
     "inspector_port": 19231
+  },
+  // Bindings (kv_namespaces, r2_buckets, services, vars) are NON-INHERITABLE
+  // — Wrangler does not fall back to the top-level value, so an env block
+  // that omits one deploys a Worker with that binding simply absent. Every
+  // env below therefore re-declares RATE_LIMIT_KV in full. `name`,
+  // `main`, `compatibility_date` and `compatibility_flags` DO inherit;
+  // `name` is set explicitly anyway because Wrangler would otherwise
+  // auto-suffix it into `prajasabha-vault-svc-dev-staging`.
+  "env": {
+    "staging": {
+      "name": "prajasabha-vault-svc-staging",
+      "kv_namespaces": [
+        { "binding": "RATE_LIMIT_KV", "id": "REPLACE_WITH_VAULT_SVC_STAGING_KV_ID" }
+      ]
+    },
+    "production": {
+      "name": "prajasabha-vault-svc-prod",
+      "kv_namespaces": [{ "binding": "RATE_LIMIT_KV", "id": "REPLACE_WITH_VAULT_SVC_PROD_KV_ID" }]
+    }
   }
   // Secrets (never committed): VAULT_SVC_DATABASE_URL, EMAIL_ENCRYPTION_KEY,
   // EMAIL_HASH_PEPPER, VAULT_SVC_INTERNAL_TOKEN, MAGIC_LINK_TTL_MINUTES,
   // EPIC_HASH_PEPPER, EPIC_ENCRYPTION_KEY, EPIC_DOC_ENCRYPTION_KEY,
   // TURNSTILE_SECRET_KEY, REVIEW_QUEUE_TOKEN, REVIEW_QUEUE_IP_ALLOWLIST,
   // EPIC_SUBMIT_RATE_LIMIT_PER_IP_PER_HOUR (issue #16/#22) — see .env.example.
+  //
+  // Secrets are per-environment and non-inheritable: set each with
+  // `wrangler secret put <NAME> --env staging|production`. No value may be
+  // reused across environments (#18's AC) — least of all this Worker's
+  // encryption keys and hash peppers, where sharing a pepper between
+  // staging and prod would make staging's data a rainbow table for
+  // production's. See docs/deploy.md.
 }

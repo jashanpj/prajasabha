@@ -1,6 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "prajasabha-jobs",
+  // Issue #18 — top level is the DEV environment on purpose; a bare
+  // `wrangler deploy` targets top-level config, so it can only ever hit a
+  // throwaway dev Worker. staging/production are explicit --env targets.
+  // See docs/deploy.md.
+  "name": "prajasabha-jobs-dev",
   "main": "./src/index.ts",
   "compatibility_date": "2025-01-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -11,27 +15,75 @@
   // binding, never at a public *.workers.dev URL. `workers_dev: false`
   // (no `routes` configured either) is what makes that true — do not
   // remove this without adding a second auth factor to /internal/sweep.
+  //
+  // `workers_dev` is an INHERITABLE key, so this `false` cascades into both
+  // env blocks below — staging and prod stay non-public too. It is left
+  // top-level rather than repeated so there is exactly one place to change
+  // it; do not add `workers_dev: true` to an env block without revisiting
+  // the single-factor auth above.
   "workers_dev": false,
+  // `workers_dev: false` alone is NOT sufficient (issue #18 security review).
+  // `preview_urls` is a SEPARATE inheritable key that defaults to true, and
+  // it serves the Worker at <version>-<name>.<subdomain>.workers.dev — so
+  // with it unset, POST /internal/sweep stays internet-reachable behind only
+  // JOBS_INTERNAL_TOKEN, exactly the single-factor exposure the comment above
+  // claims is impossible. Wrangler does warn about this combination, but
+  // suppresses the warning on first deploy and in CI, so it would never have
+  // been seen. BOTH keys are load-bearing: do not set either to true without
+  // adding a second auth factor to /internal/sweep.
+  "preview_urls": false,
   // Issue #35 — C3 Deliberation Lifecycle. Daily is enough granularity for
   // a 14-day-default window; see apps/jobs/src/lifecycle-sweep.ts for the
-  // actual Open->Closed->Summarized logic this triggers.
+  // actual Open->Closed->Summarized logic this triggers. `triggers` is
+  // inheritable too, so every environment runs the same daily sweep against
+  // its own database — which is what makes staging a real rehearsal of prod.
   "triggers": {
     "crons": ["0 3 * * *"]
   },
-  // Needs a real bucket per environment
-  // (`wrangler r2 bucket create prajasabha-deliberation-artifacts`) before
-  // deploying — local `wrangler dev` emulates it. Stores the generated
-  // consensus-summary PDFs (packages/shared's generateDeliberationSummaryPdf);
-  // the R2 key is recorded on deliberations.summary_artifact_key.
+  // Stores the generated consensus-summary PDFs (packages/shared's
+  // generateDeliberationSummaryPdf); the R2 key is recorded on
+  // deliberations.summary_artifact_key. Buckets are per environment so a
+  // staging sweep can never read or overwrite a production constituency's
+  // published consensus artifacts — create each with
+  // `wrangler r2 bucket create <name>` per docs/deploy.md. Local
+  // `wrangler dev` emulates the bucket.
   "r2_buckets": [
-    { "binding": "DELIBERATION_ARTIFACTS", "bucket_name": "prajasabha-deliberation-artifacts" }
+    { "binding": "DELIBERATION_ARTIFACTS", "bucket_name": "prajasabha-deliberation-artifacts-dev" }
   ],
   "dev": {
     "port": 8788,
     "inspector_port": 19230
+  },
+  // Bindings (r2_buckets, kv_namespaces, services, vars) are
+  // NON-INHERITABLE — an env block that omits one deploys with that binding
+  // silently absent rather than falling back to the top-level value. Each
+  // env below therefore re-declares DELIBERATION_ARTIFACTS in full.
+  "env": {
+    "staging": {
+      "name": "prajasabha-jobs-staging",
+      "r2_buckets": [
+        {
+          "binding": "DELIBERATION_ARTIFACTS",
+          "bucket_name": "prajasabha-deliberation-artifacts-staging"
+        }
+      ]
+    },
+    "production": {
+      "name": "prajasabha-jobs-prod",
+      "r2_buckets": [
+        {
+          "binding": "DELIBERATION_ARTIFACTS",
+          "bucket_name": "prajasabha-deliberation-artifacts-prod"
+        }
+      ]
+    }
   }
-  // Secrets (never committed — set via `wrangler secret put <NAME>` per
-  // environment, or a gitignored .env/.dev.vars locally): APP_DATABASE_URL,
+  // Secrets (never committed — set via
+  // `wrangler secret put <NAME> --env staging|production`, or a gitignored
+  // .env/.dev.vars locally): APP_DATABASE_URL,
   // CONSENSUS_AGREEMENT_THRESHOLD_PERCENT, CONSENSUS_MIN_VOTERS — see
-  // .env.example.
+  // .env.example. No value is shared across environments (#18): in
+  // particular APP_DATABASE_URL must point at a different database per env,
+  // and JOBS_INTERNAL_TOKEN must be a distinct token per env so a leaked
+  // staging token cannot drive the production sweep.
 }
