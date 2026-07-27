@@ -1,6 +1,8 @@
 {
   "nav.home": "ഹോം",
   "nav.dashboard": "ഡാഷ്ബോർഡ്",
+  "nav.issues": "പ്രശ്നങ്ങൾ",
+  "nav.raiseIssue": "പ്രശ്നം ഉന്നയിക്കുക",
   "nav.breadcrumb.label": "ബ്രെഡ്ക്രംബ്",
   "nav.cta.verify": "പങ്കാളിത്തത്തിനായി പരിശോധിക്കുക",
   "dashboard.title": "മണ്ഡല ഡാഷ്ബോർഡ്",

@@ -1,6 +1,8 @@
 {
   "nav.home": "Home",
   "nav.dashboard": "Dashboard",
+  "nav.issues": "Issues",
+  "nav.raiseIssue": "Raise an issue",
   "nav.breadcrumb.label": "Breadcrumb",
   "nav.cta.verify": "Verify to participate",
   "dashboard.title": "Constituency dashboard",
