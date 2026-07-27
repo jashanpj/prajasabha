@@ -52,6 +52,13 @@
     "port": 8789,
     "inspector_port": 19231
   },
+  // Issue #23 (A4) — the vault access log's alerting half. Every vault read
+  // appends a row to vault.access_log; a bulk read additionally emits a
+  // structured `vault_bulk_access` warn line (see src/access-log.ts). That
+  // line is only useful if it is retained and queryable, which is what this
+  // enables. A real paging channel to founders is still not wired — see
+  // docs/vault-blast-radius.md.
+  "observability": { "enabled": true },
   // Bindings (kv_namespaces, r2_buckets, services, vars) are NON-INHERITABLE
   // — Wrangler does not fall back to the top-level value, so an env block
   // that omits one deploys a Worker with that binding simply absent. Every

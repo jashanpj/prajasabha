@@ -16,6 +16,7 @@ import {
   schema,
 } from "vault-db";
 import { z } from "zod";
+import { logVaultAccess } from "./access-log";
 import type { Bindings } from "./env";
 import { requireReviewAccess } from "./review-auth";
 
@@ -146,6 +147,14 @@ export function registerEpicRoutes(app: Hono<{ Bindings: Bindings }>): void {
       )
       .limit(1);
 
+    await logVaultAccess(db, c.env as unknown as Record<string, string | undefined>, {
+      operation: "epic.link.lookup",
+      caller: "internal",
+      outcome: orphaned ? "ok" : "not_found",
+      rowCount: orphaned ? 1 : 0,
+      subjectRef: docRef,
+    });
+
     if (!orphaned) {
       return c.json({ error: "unknown_doc_ref" }, 404);
     }
@@ -189,6 +198,10 @@ export function registerEpicRoutes(app: Hono<{ Bindings: Bindings }>): void {
 
     const [latest] = await db
       .select({
+        // verificationId is selected only so the access log can reference the
+        // VAULT ROW rather than the member_id — see the logVaultAccess call
+        // below. It is not returned to the caller.
+        verificationId: schema.epicVerifications.verificationId,
         status: schema.epicVerifications.status,
         assemblySegmentClaimed: schema.epicVerifications.assemblySegmentClaimed,
         reviewedAt: schema.epicVerifications.reviewedAt,
@@ -197,6 +210,20 @@ export function registerEpicRoutes(app: Hono<{ Bindings: Bindings }>): void {
       .where(eq(schema.epicVerifications.memberId, memberId))
       .orderBy(desc(schema.epicVerifications.createdAt))
       .limit(1);
+
+    // subjectRef is the verification row id, NOT the memberId this read was
+    // keyed by. Logging the memberId would make access_log a second
+    // member_id-bearing vault table, and schema.ts's header plus
+    // docs/vault-blast-radius.md both rest on epic_verifications.member_id
+    // being the only vault->participation link in the system. A miss has no
+    // row to reference, so it logs null — the same shape a bulk read uses.
+    await logVaultAccess(db, c.env as unknown as Record<string, string | undefined>, {
+      operation: "epic.status",
+      caller: "internal",
+      outcome: latest ? "ok" : "not_found",
+      rowCount: latest ? 1 : 0,
+      subjectRef: latest?.verificationId ?? null,
+    });
 
     if (!latest) {
       return c.json({ error: "not_found" }, 404);
@@ -249,6 +276,23 @@ export function registerEpicRoutes(app: Hono<{ Bindings: Bindings }>): void {
           : null,
       })),
     );
+
+    // Issue #23 — the single most sensitive read in the system: one call
+    // decrypts every pending row's EPIC number AND uploaded document. rowCount
+    // is what makes that visible, and what the bulk-access alert triggers on.
+    // Logged after the decrypt loop so the count reflects what was actually
+    // returned, and awaited before responding so a lost audit record fails the
+    // request rather than silently succeeding.
+    await logVaultAccess(db, c.env as unknown as Record<string, string | undefined>, {
+      operation: "epic.review_queue",
+      caller: "review",
+      outcome: "ok",
+      rowCount: queue.length,
+      // Deliberately null: a bulk read has no single subject, and listing
+      // every member_id here would turn one audit row into a second copy of
+      // the queue.
+      subjectRef: null,
+    });
 
     return c.json(queue);
   });

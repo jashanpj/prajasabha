@@ -32,6 +32,7 @@ interface EpicBindings extends Bindings {
   EPIC_ENCRYPTION_KEY: string;
   EPIC_DOC_ENCRYPTION_KEY: string;
   EPIC_SUBMIT_RATE_LIMIT_PER_IP_PER_HOUR: string;
+  VAULT_ACCESS_ALERT_ROW_THRESHOLD: string;
 }
 
 function fakeKv(): KVNamespace {
@@ -71,6 +72,11 @@ function testEnv(overrides: Partial<EpicBindings> = {}): EpicBindings {
     REVIEW_QUEUE_IP_ALLOWLIST: REVIEW_IP,
     RATE_LIMIT_KV: fakeKv(),
     EPIC_SUBMIT_RATE_LIMIT_PER_IP_PER_HOUR: "1000",
+    // Issue #23 — every logged vault read loads this threshold, so it must
+    // be present or loadVaultAccessAlertConfig throws. High by default so
+    // existing tests do not incidentally trip the bulk-access warn line;
+    // access-log.test.ts overrides it to assert the alert fires.
+    VAULT_ACCESS_ALERT_ROW_THRESHOLD: "1000",
     ...overrides,
   };
 }

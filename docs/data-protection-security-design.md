@@ -101,6 +101,8 @@ Assets at stake: (A1) identity↔opinion linkage, (A2) ledger integrity, (A3) de
 
 **Design consequence worth stating plainly:** the strongest answer to both the state actor and the SLAPP litigant is identical — *the vault cannot answer questions it was never designed to answer.* There is no query that returns "who wrote statement X" without dual-key vault access, and no query anywhere that returns Aadhaar numbers, because none are stored.
 
+**Per-breach analysis:** see [`vault-blast-radius.md`](./vault-blast-radius.md) (issue #23, required by PRD A4 / HLD §4.4) for what each individual compromise actually yields, the DPDP erasure model, and — importantly — the list of design promises in this document that are **not yet true in the deployed system** (single physical Postgres for both schemas, no dual-control key split, no alert delivery channel).
+
 ---
 
 ## 7. Security controls (engineering summary)
