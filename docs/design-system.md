@@ -9,15 +9,20 @@ treated: copy values exactly, don't eyeball them off a screenshot.
 
 ## ⚠️ Before this package (or any screenshot of it) goes anywhere public
 
-The design mockups use the **real sitting MP's name** ("Hibi Eden",
-Ernakulam) as the default/sample data in `Praja Civic Platform.dc.html`,
+The design mockups use the **real sitting MP's name** for the pilot
+constituency as the default/sample data in `Praja Civic Platform.dc.html`,
 `web/mp-dashboard.dc.html`, and the `mpName` prop default. This is exactly
 the risk the PRD already calls out (Risks & Dependencies #9: "Real-
 representative data in design assets... replace with fictional placeholder
 before any external sharing"). It is now confirmed present, not
 hypothetical. **Do not commit the raw design files to this public repo, and
 redact the name before sharing screenshots externally**, until this is
-fixed. Tracked as a new issue (see below).
+fixed. Tracked as #74.
+
+The name itself is deliberately not repeated here: this file is committed to
+a public repo, so naming the person in the very note that warns against
+exposing them would defeat the purpose. See #74 for the specific occurrences
+to fix in the design package.
 
 ## Brand
 
