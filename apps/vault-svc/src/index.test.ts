@@ -40,6 +40,7 @@ function testEnv(overrides: Partial<Bindings> = {}): Bindings {
       async put() {},
     } as unknown as KVNamespace,
     EPIC_SUBMIT_RATE_LIMIT_PER_IP_PER_HOUR: "1000",
+    VAULT_ACCESS_ALERT_ROW_THRESHOLD: "1000",
     ...overrides,
   };
 }

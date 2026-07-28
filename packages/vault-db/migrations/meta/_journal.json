@@ -15,6 +15,13 @@
       "when": 1785048910638,
       "tag": "0001_add_epic_verifications",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785172781554,
+      "tag": "0002_add_access_log",
+      "breakpoints": true
     }
   ]
 }

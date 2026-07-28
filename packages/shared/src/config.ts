@@ -617,3 +617,36 @@ export function loadStatementModerationAdminConfig(
     ipAllowlist: env.STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST,
   });
 }
+
+// Issue #23 (A4) — vault access logging. HLD §4.1 requires every vault read to
+// append to an access log "alerting to founders". The row count that counts as
+// worth alerting on is a threshold, and CLAUDE.md invariant 6 forbids
+// thresholds as literals in code, so it is config like concernThresholdT2 is.
+//
+// Read only by apps/vault-svc, hence its own loader rather than a field on an
+// existing config blob — same reasoning as loadEpicSubmitRateLimitConfig
+// above: bundling would force apps/web to declare a var it never reads.
+
+const VAULT_ACCESS_ALERT_REQUIRED_VARS = ["VAULT_ACCESS_ALERT_ROW_THRESHOLD"] as const;
+
+const VaultAccessAlertConfigSchema = z.object({
+  // Rows exposed by a SINGLE vault call. Above this, logVaultAccess also
+  // emits a structured warn line for Workers Analytics to alarm on. The read
+  // that matters is /review/epic/queue, which decrypts every pending row's
+  // EPIC number and document in one request.
+  vaultAccessAlertRowThreshold: z.coerce.number().int().positive(),
+});
+
+export type VaultAccessAlertConfig = z.infer<typeof VaultAccessAlertConfigSchema>;
+
+/** apps/vault-svc's bulk-vault-read alert threshold (issue #23). */
+export function loadVaultAccessAlertConfig(
+  env: Record<string, string | undefined>,
+): VaultAccessAlertConfig {
+  const missing = VAULT_ACCESS_ALERT_REQUIRED_VARS.filter((key) => env[key] === undefined);
+  if (missing.length > 0) throw missingVarsError(missing);
+
+  return VaultAccessAlertConfigSchema.parse({
+    vaultAccessAlertRowThreshold: env.VAULT_ACCESS_ALERT_ROW_THRESHOLD,
+  });
+}

@@ -21,6 +21,7 @@ import {
   loadStatementModerationAdminConfig,
   loadStatementSubmitRateLimitConfig,
   loadStatementVoteRateLimitConfig,
+  loadVaultAccessAlertConfig,
 } from "./config";
 
 const VALID_CORE_ENV = {
@@ -747,6 +748,29 @@ describe("loadStatementModerationAdminConfig (C1 — issue #33)", () => {
         STATEMENT_MODERATION_ADMIN_TOKEN: "",
         STATEMENT_MODERATION_ADMIN_IP_ALLOWLIST: "203.0.113.10",
       }),
+    ).toThrow();
+  });
+});
+
+describe("loadVaultAccessAlertConfig (A4 — issue #23)", () => {
+  it("resolves the bulk-read alert threshold from env", () => {
+    expect(loadVaultAccessAlertConfig({ VAULT_ACCESS_ALERT_ROW_THRESHOLD: "25" })).toEqual({
+      vaultAccessAlertRowThreshold: 25,
+    });
+  });
+
+  it("throws when env is empty (no silent fallback — CLAUDE.md invariant 6)", () => {
+    expect(() => loadVaultAccessAlertConfig({})).toThrow(/VAULT_ACCESS_ALERT_ROW_THRESHOLD/);
+  });
+
+  it("rejects a non-positive threshold", () => {
+    expect(() => loadVaultAccessAlertConfig({ VAULT_ACCESS_ALERT_ROW_THRESHOLD: "0" })).toThrow();
+    expect(() => loadVaultAccessAlertConfig({ VAULT_ACCESS_ALERT_ROW_THRESHOLD: "-1" })).toThrow();
+  });
+
+  it("rejects a non-numeric threshold", () => {
+    expect(() =>
+      loadVaultAccessAlertConfig({ VAULT_ACCESS_ALERT_ROW_THRESHOLD: "lots" }),
     ).toThrow();
   });
 });

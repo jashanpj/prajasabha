@@ -22,4 +22,8 @@ export interface Bindings {
   // posture as apps/web's register/start.ts).
   RATE_LIMIT_KV: KVNamespace;
   EPIC_SUBMIT_RATE_LIMIT_PER_IP_PER_HOUR: string;
+  // Issue #23 (A4) — rows exposed by a single vault call above which
+  // logVaultAccess also emits a structured warn line for alerting. A
+  // threshold, so config not a literal (CLAUDE.md invariant 6).
+  VAULT_ACCESS_ALERT_ROW_THRESHOLD: string;
 }

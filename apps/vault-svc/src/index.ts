@@ -2,6 +2,7 @@ import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { loadMagicLinkConfig } from "shared";
 import { createVaultDbClient, encryptEmail, hashEmail, schema } from "vault-db";
+import { logVaultAccess } from "./access-log";
 import { requireInternalToken } from "./auth";
 import type { Bindings } from "./env";
 import { registerEpicRoutes } from "./epic";
@@ -61,6 +62,17 @@ app.post("/internal/registrations/start", async (c) => {
     )
     .limit(1);
 
+  // Issue #23 — this SELECT probes for an existing account by email hash, so
+  // even a zero-row answer is a fact about a real person's email. Logged
+  // either way; `outcome` records which answer the caller got.
+  await logVaultAccess(db, c.env as unknown as Record<string, string | undefined>, {
+    operation: "registration.start.duplicate_check",
+    caller: "internal",
+    outcome: existingLinked.length > 0 ? "ok" : "not_found",
+    rowCount: existingLinked.length,
+    subjectRef: existingLinked[0]?.id ?? null,
+  });
+
   if (existingLinked.length > 0) {
     return c.json({ reason: "duplicate_email" }, 409);
   }
@@ -118,6 +130,16 @@ app.post("/internal/registrations/consume", async (c) => {
     });
 
   if (consumed) {
+    // Issue #23 — identity data (pseudonym, locale) leaves the vault here.
+    // That makes this a read for audit purposes even though the statement is
+    // an UPDATE ... RETURNING.
+    await logVaultAccess(db, c.env as unknown as Record<string, string | undefined>, {
+      operation: "registration.consume",
+      caller: "internal",
+      outcome: "ok",
+      rowCount: 1,
+      subjectRef: consumed.id,
+    });
     return c.json({
       registrationId: consumed.id,
       pseudonym: consumed.pseudonym,
@@ -133,6 +155,14 @@ app.post("/internal/registrations/consume", async (c) => {
     .from(schema.authCredentials)
     .where(eq(schema.authCredentials.tokenHash, tokenHash))
     .limit(1);
+
+  await logVaultAccess(db, c.env as unknown as Record<string, string | undefined>, {
+    operation: "registration.consume",
+    caller: "internal",
+    outcome: existing ? "ok" : "not_found",
+    rowCount: existing ? 1 : 0,
+    subjectRef: existing?.id ?? null,
+  });
 
   return c.json(
     { error: existing ? "expired_or_consumed_token" : "invalid_token" },
@@ -177,6 +207,14 @@ app.post("/internal/registrations/:id/complete", async (c) => {
     .from(schema.authCredentials)
     .where(eq(schema.authCredentials.id, registrationId))
     .limit(1);
+
+  await logVaultAccess(db, c.env as unknown as Record<string, string | undefined>, {
+    operation: "registration.complete.lookup",
+    caller: "internal",
+    outcome: existing ? "ok" : "not_found",
+    rowCount: existing ? 1 : 0,
+    subjectRef: registrationId,
+  });
 
   if (!existing) {
     return c.json({ error: "unknown_registration" }, 404);
