@@ -13,7 +13,7 @@
     "deploy:production": "CLOUDFLARE_ENV=production astro build && wrangler deploy --env production"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^13.7.0",
+    "@astrojs/cloudflare": "^14.1.6",
     "astro": "^6.4.8",
     "db": "workspace:*",
     "drizzle-orm": "^0.45.2",
