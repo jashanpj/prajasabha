@@ -14,7 +14,7 @@
   "devDependencies": {
     "@types/node": "^20.17.9",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.4"
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1",
